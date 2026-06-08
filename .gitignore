@@ -1,0 +1,40 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+
+# Environment files - NEVER commit real keys
+.env
+.env.local
+.env.production
+.env.staging
+
+# Build outputs
+dist/
+build/
+.next/
+
+# ML model files
+*.pkl
+*.h5
+*.joblib
+*.onnx
+
+# Supabase local
+.supabase/
+
+# Misc
+*.log
+.DS_Store
+.vscode/settings.json
+Thumbs.db
+
+# Test coverage
+coverage/
+.nyc_output/
+htmlcov/
+
+# Python
+*.egg-info/
+.pytest_cache/

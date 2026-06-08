@@ -1,0 +1,89 @@
+const express = require('express');
+const { createClient } = require('@supabase/supabase-js');
+const { z } = require('zod');
+
+const router = express.Router();
+
+function getDb() {
+  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+}
+
+const ResourceSchema = z.object({
+  name: z.string().min(2).max(200),
+  type: z.enum(['ambulance', 'fire_truck', 'helicopter', 'shelter', 'food', 'water', 'medical', 'rescue_team', 'other']),
+  status: z.enum(['available', 'deployed', 'maintenance', 'unavailable']).default('available'),
+  quantity: z.number().int().min(0).default(1),
+  location: z.object({ lat: z.number(), lon: z.number() }).optional(),
+  contact: z.string().optional(),
+  notes: z.string().optional(),
+  assigned_event: z.string().uuid().optional(),
+});
+
+// ── GET /api/resources ────────────────────────────────
+router.get('/', async (req, res) => {
+  try {
+    const { type, status, limit = 200 } = req.query;
+    let query = getDb().from('resources').select('*').limit(Number(limit));
+    if (type) query = query.eq('type', type);
+    if (status) query = query.eq('status', status);
+    const { data, error } = await query;
+    if (error) throw error;
+    res.json({ data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── POST /api/resources ───────────────────────────────
+router.post('/', async (req, res) => {
+  const parsed = ResourceSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
+  }
+  const { location, ...rest } = parsed.data;
+  try {
+    const { data, error } = await getDb()
+      .from('resources')
+      .insert({
+        ...rest,
+        ...(location && {
+          location: `SRID=4326;POINT(${location.lon} ${location.lat})`,
+        }),
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    res.status(201).json({ data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── PATCH /api/resources/:id ──────────────────────────
+router.patch('/:id', async (req, res) => {
+  try {
+    const { data, error } = await getDb()
+      .from('resources')
+      .update({ ...req.body, updated_at: new Date().toISOString() })
+      .eq('id', req.params.id)
+      .select()
+      .single();
+    if (error) throw error;
+    res.json({ data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── DELETE /api/resources/:id ─────────────────────────
+router.delete('/:id', async (req, res) => {
+  try {
+    const { error } = await getDb().from('resources').delete().eq('id', req.params.id);
+    if (error) throw error;
+    res.json({ message: 'Resource deleted' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+module.exports = router;

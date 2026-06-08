@@ -1,0 +1,122 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Google Fonts ──────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ── CSS Custom Properties ─────────────────────────── */
+:root {
+  --color-critical: #ef4444;
+  --color-high:     #f59e0b;
+  --color-medium:   #3b82f6;
+  --color-low:      #10b981;
+  --glass-bg:       rgba(15, 23, 42, 0.8);
+  --glass-border:   rgba(255, 255, 255, 0.08);
+}
+
+/* ── Base Resets ────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: #0a0f1e;
+  color: #e2e8f0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── Scrollbar Styling ──────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #0f172a; }
+::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* ── Glassmorphism Utility ──────────────────────────── */
+@layer components {
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+  }
+
+  .glass-card {
+    @apply glass rounded-xl p-4 shadow-lg;
+  }
+
+  /* ── Severity Badges ──────────────────────────────── */
+  .severity-badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wide;
+  }
+  .severity-critical { @apply severity-badge bg-red-500/20 text-red-400 border border-red-500/30; }
+  .severity-high     { @apply severity-badge bg-amber-500/20 text-amber-400 border border-amber-500/30; }
+  .severity-medium   { @apply severity-badge bg-blue-500/20 text-blue-400 border border-blue-500/30; }
+  .severity-low      { @apply severity-badge bg-emerald-500/20 text-emerald-400 border border-emerald-500/30; }
+
+  /* ── Button Variants ──────────────────────────────── */
+  .btn {
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm
+           transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2
+           focus:ring-offset-surface-800 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-primary   { @apply btn bg-brand-600 text-white hover:bg-brand-500 focus:ring-brand-500; }
+  .btn-danger    { @apply btn bg-danger-600 text-white hover:bg-danger-700 focus:ring-danger-500; }
+  .btn-ghost     { @apply btn bg-transparent text-slate-300 hover:bg-white/10 focus:ring-white/20; }
+  .btn-outline   { @apply btn border border-white/20 text-slate-300 hover:bg-white/5 focus:ring-white/20; }
+
+  /* ── Input Fields ─────────────────────────────────── */
+  .input {
+    @apply w-full px-3 py-2 rounded-lg bg-surface-700 border border-white/10 text-white
+           placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500
+           focus:border-transparent transition-colors text-sm;
+  }
+
+  /* ── Pulse Ring Animation for alerts ─────────────── */
+  .pulse-ring::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    animation: pulseRing 2s ease-out infinite;
+  }
+
+  @keyframes pulseRing {
+    0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+    70%  { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+  }
+}
+
+/* ── Leaflet Map Override ───────────────────────────── */
+.leaflet-container {
+  background: #1e293b !important;
+  font-family: 'Inter', sans-serif !important;
+}
+.leaflet-tile {
+  filter: brightness(0.85) saturate(0.7);
+}
+.leaflet-popup-content-wrapper {
+  background: #1e293b !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5) !important;
+  color: #e2e8f0 !important;
+}
+.leaflet-popup-tip { background: #1e293b !important; }
+
+/* ── Loading Spinner ────────────────────────────────── */
+.spinner {
+  width: 24px; height: 24px;
+  border: 2px solid rgba(255,255,255,0.15);
+  border-top-color: #4d7bff;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
