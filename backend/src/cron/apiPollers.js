@@ -3,8 +3,8 @@ const { createClient } = require('@supabase/supabase-js');
 const { fetchEarthquakes } = require('../services/usgsEarthquake');
 const { fetchFireHotspots } = require('../services/nasaFirms');
 const { fetchGdacsAlerts, fetchEonetEvents } = require('../services/gdacs');
-const { fetchSachetAlerts } = require('../services/sachet');   // 🇮🇳 NDMA India
-const { fetchImdAlerts } = require('../services/imd');         // 🇮🇳 IMD India
+const { fetchIndiaAlerts } = require('../services/india-alerts'); // 🇮🇳 GDACS India BBox + FloodList
+const { fetchImdAlerts } = require('../services/imd');            // 🇮🇳 IMD Open-Meteo hazards
 
 let supabase;
 
@@ -99,14 +99,14 @@ function startCronJobs(io) {
     }
   });
 
-  // 🇮🇳 ── SACHET NDMA Alerts every 5 min (India) ─────
+  // 🇮🇳 ── India Alerts (GDACS BBox + FloodList) every 5 min ──
   cron.schedule('*/5 * * * *', async () => {
-    console.log('[Cron] Polling SACHET (NDMA India) alerts...');
+    console.log('[Cron] Polling India alerts (GDACS BBox + FloodList)...');
     try {
-      const events = await fetchSachetAlerts();
-      if (events.length > 0) await upsertEvents(events, io, 'SACHET');
+      const events = await fetchIndiaAlerts();
+      if (events.length > 0) await upsertEvents(events, io, 'India');
     } catch (e) {
-      console.error('[Cron] SACHET poll error:', e.message);
+      console.error('[Cron] India alerts poll error:', e.message);
     }
   });
 
@@ -125,20 +125,20 @@ function startCronJobs(io) {
   setTimeout(async () => {
     console.log('[Cron] Running initial data fetch on startup...');
     try {
-      const [quakes, fires, gdacs, eonet, sachet, imd] = await Promise.allSettled([
+      const [quakes, fires, gdacs, eonet, india, imd] = await Promise.allSettled([
         fetchEarthquakes(4.0, 24),
         fetchFireHotspots(),
         fetchGdacsAlerts(),
         fetchEonetEvents(),
-        fetchSachetAlerts(),   // 🇮🇳 India
-        fetchImdAlerts(),      // 🇮🇳 India
+        fetchIndiaAlerts(),  // 🇮🇳 India (GDACS BBox + FloodList)
+        fetchImdAlerts(),    // 🇮🇳 IMD weather hazards
       ]);
       if (quakes.value)  await upsertEvents(quakes.value,  io, 'Earthquake');
       if (fires.value)   await upsertEvents(fires.value,   io, 'Wildfire');
       if (gdacs.value)   await upsertEvents(gdacs.value,   io, 'GDACS');
       if (eonet.value)   await upsertEvents(eonet.value,   io, 'EONET');
-      if (sachet.value && sachet.value.length)  await upsertEvents(sachet.value, io, 'SACHET');
-      if (imd.value    && imd.value.length)     await upsertEvents(imd.value,    io, 'IMD');
+      if (india.value && india.value.length) await upsertEvents(india.value, io, 'India');
+      if (imd.value && imd.value.length) await upsertEvents(imd.value, io, 'IMD');
     } catch (e) {
       console.error('[Cron] Initial fetch error:', e.message);
     }
