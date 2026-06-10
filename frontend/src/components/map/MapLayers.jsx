@@ -1,9 +1,10 @@
 import useAppStore from '@/store/useAppStore';
+import PinSearch from './PinSearch';
 
 const EVENT_TYPES = [
   'all', 'Earthquake', 'Wildfire', 'Flood',
   'Cyclone', 'Tsunami', 'Volcano', 'Landslide',
-  'Drought', 'Natural Event',
+  'Drought', 'Heatwave', 'Cold Wave', 'Natural Event',
 ];
 const SEVERITIES = ['all', 'Critical', 'High', 'Medium', 'Low'];
 
@@ -37,19 +38,47 @@ function fitAllEvents() {
 export default function MapLayers() {
   const filters = useAppStore((s) => s.filters);
   const setFilter = useAppStore((s) => s.setFilter);
+  const clearStateFilter = useAppStore((s) => s.clearStateFilter);
   const events = useAppStore((s) => s.events);
 
   return (
-    <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2 pointer-events-auto">
-      {/* Fit all button */}
-      <button
-        id="btn-fit-all"
-        onClick={fitAllEvents}
-        title="Zoom to show all events worldwide"
-        className="glass rounded-xl px-3 py-2 text-xs text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-2"
-      >
-        🌍 Fit All Events ({events.filter(e => e.is_active).length})
-      </button>
+    <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2 pointer-events-auto" style={{ maxWidth: 200 }}>
+      {/* 🇮🇳 PIN Code / City Search */}
+      <PinSearch />
+
+      {/* Active state filter badge */}
+      {filters.stateFilter && (
+        <div className="glass rounded-xl px-3 py-2 flex items-center justify-between gap-2">
+          <span className="text-xs text-slate-300">🇮🇳 {filters.stateFilter}</span>
+          <button
+            onClick={clearStateFilter}
+            className="text-xs text-slate-500 hover:text-red-400 transition-colors"
+            title="Clear state filter"
+          >✕ Clear</button>
+        </div>
+      )}
+      {/* Fit all / Zoom India buttons */}
+      <div className="flex gap-2">
+        <button
+          id="btn-fit-all"
+          onClick={fitAllEvents}
+          title="Zoom to show all events worldwide"
+          className="glass rounded-xl px-3 py-2 text-xs text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-2"
+        >
+          🌍 Fit All ({events.filter(e => e.is_active).length})
+        </button>
+        <button
+          id="btn-zoom-india"
+          onClick={() => {
+            const map = window.__civicshieldMap;
+            if (map) map.flyTo([22.5, 80.0], 5, { duration: 1.2 });
+          }}
+          title="Zoom to India"
+          className="glass rounded-xl px-3 py-2 text-xs text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-2"
+        >
+          🇮🇳 India
+        </button>
+      </div>
 
       {/* Event Type Filter */}
       <div className="glass rounded-xl p-3 min-w-[160px]">

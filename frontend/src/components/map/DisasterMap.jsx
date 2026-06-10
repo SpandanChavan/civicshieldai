@@ -1,10 +1,11 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import useAppStore from '@/store/useAppStore';
 import { getEventLatLon, eventMarkerIcon } from '@/utils/geoHelpers';
 import { timeAgo } from '@/utils/formatDate';
 import { routingApi } from '@/services/backendApi';
+import IndiaMapLayer from './IndiaMapLayer';
 
 // ── Fix Leaflet default marker icon paths for Vite ──
 // MUST be done before any L.map() call
@@ -19,6 +20,7 @@ export default function DisasterMap({ onEventSelect }) {
   const mapRef = useRef(null);
   const mapInstance = useRef(null);  // Holds the L.Map instance
   const markersRef = useRef({});     // id → L.Marker
+  const [mapReady, setMapReady] = useState(false);
 
   const events = useAppStore((s) => s.events);
   const filters = useAppStore((s) => s.filters);
@@ -35,6 +37,7 @@ export default function DisasterMap({ onEventSelect }) {
       zoomControl: false,
     });
     window.__civicshieldMap = mapInstance.current; // expose for MapLayers fitAll
+    setMapReady(true);
 
 
     // Custom zoom control (top-right)
@@ -68,6 +71,14 @@ export default function DisasterMap({ onEventSelect }) {
       if (!e.is_active) return false;
       if (filters.eventType !== 'all' && e.event_type !== filters.eventType) return false;
       if (filters.severity !== 'all' && e.severity !== filters.severity) return false;
+      // 🇮🇳 India state filter — filter by bounding box of clicked state
+      if (filters.stateFilter && window.__civicshieldStateFilter?.bounds) {
+        const { ne, sw } = window.__civicshieldStateFilter.bounds;
+        const pos = getEventLatLon(e);
+        if (pos) {
+          if (pos.lat < sw.lat || pos.lat > ne.lat || pos.lon < sw.lng || pos.lon > ne.lng) return false;
+        }
+      }
       return true;
     });
 
@@ -158,6 +169,8 @@ export default function DisasterMap({ onEventSelect }) {
         style={{ height: '100%', width: '100%' }}
         aria-label="Disaster event map"
       />
+      {/* 🇮🇳 India state boundaries layer — renders imperatively into Leaflet */}
+      {mapReady && <IndiaMapLayer map={mapInstance.current} />}
     </div>
   );
 }

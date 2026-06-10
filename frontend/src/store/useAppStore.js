@@ -49,11 +49,16 @@ const useAppStore = create((set, get) => ({
     showHeatmap: false,
     showClusters: true,
     showResources: true,
+    stateFilter: null,   // 🇮🇳 India state boundary filter
   },
   setFilter: (key, value) =>
     set((state) => ({
       filters: { ...state.filters, [key]: value },
     })),
+  clearStateFilter: () => {
+    window.__civicshieldStateFilter = null;
+    set((state) => ({ filters: { ...state.filters, stateFilter: null } }));
+  },
 
   // ── UI State ────────────────────────────────────────
   sidebarOpen: true,

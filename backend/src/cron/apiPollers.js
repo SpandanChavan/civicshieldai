@@ -3,6 +3,8 @@ const { createClient } = require('@supabase/supabase-js');
 const { fetchEarthquakes } = require('../services/usgsEarthquake');
 const { fetchFireHotspots } = require('../services/nasaFirms');
 const { fetchGdacsAlerts, fetchEonetEvents } = require('../services/gdacs');
+const { fetchSachetAlerts } = require('../services/sachet');   // 🇮🇳 NDMA India
+const { fetchImdAlerts } = require('../services/imd');         // 🇮🇳 IMD India
 
 let supabase;
 
@@ -97,20 +99,46 @@ function startCronJobs(io) {
     }
   });
 
+  // 🇮🇳 ── SACHET NDMA Alerts every 5 min (India) ─────
+  cron.schedule('*/5 * * * *', async () => {
+    console.log('[Cron] Polling SACHET (NDMA India) alerts...');
+    try {
+      const events = await fetchSachetAlerts();
+      if (events.length > 0) await upsertEvents(events, io, 'SACHET');
+    } catch (e) {
+      console.error('[Cron] SACHET poll error:', e.message);
+    }
+  });
+
+  // 🇮🇳 ── IMD Weather Hazards every 30 min (India) ───
+  cron.schedule('*/30 * * * *', async () => {
+    console.log('[Cron] Polling IMD weather hazards...');
+    try {
+      const events = await fetchImdAlerts();
+      if (events.length > 0) await upsertEvents(events, io, 'IMD');
+    } catch (e) {
+      console.error('[Cron] IMD poll error:', e.message);
+    }
+  });
+
   // Run initial fetch immediately on startup
   setTimeout(async () => {
     console.log('[Cron] Running initial data fetch on startup...');
     try {
-      const [quakes, fires, gdacs, eonet] = await Promise.allSettled([
+      const [quakes, fires, gdacs, eonet, sachet, imd] = await Promise.allSettled([
         fetchEarthquakes(4.0, 24),
         fetchFireHotspots(),
         fetchGdacsAlerts(),
         fetchEonetEvents(),
+        fetchSachetAlerts(),   // 🇮🇳 India
+        fetchImdAlerts(),      // 🇮🇳 India
       ]);
-      if (quakes.value) await upsertEvents(quakes.value, io, 'Earthquake');
-      if (fires.value) await upsertEvents(fires.value, io, 'Wildfire');
-      if (gdacs.value) await upsertEvents(gdacs.value, io, 'GDACS');
-      if (eonet.value) await upsertEvents(eonet.value, io, 'EONET');
+      if (quakes.value)  await upsertEvents(quakes.value,  io, 'Earthquake');
+      if (fires.value)   await upsertEvents(fires.value,   io, 'Wildfire');
+      if (gdacs.value)   await upsertEvents(gdacs.value,   io, 'GDACS');
+      if (eonet.value)   await upsertEvents(eonet.value,   io, 'EONET');
+      if (sachet.value && sachet.value.length)  await upsertEvents(sachet.value, io, 'SACHET');
+      if (imd.value    && imd.value.length)     await upsertEvents(imd.value,    io, 'IMD');
     } catch (e) {
       console.error('[Cron] Initial fetch error:', e.message);
     }

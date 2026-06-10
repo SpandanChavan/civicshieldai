@@ -49,7 +49,8 @@ router.get('/', async (req, res) => {
       const PER_TYPE = 60;
       const EVENT_TYPES = [
         'Earthquake', 'Wildfire', 'Flood', 'Cyclone',
-        'Tsunami', 'Volcano', 'Landslide', 'Drought', 'Natural Event',
+        'Tsunami', 'Volcano', 'Landslide', 'Drought',
+        'Heatwave', 'Cold Wave', 'Natural Event', // 🇮🇳 India-specific
       ];
 
       const queries = EVENT_TYPES.map((et) => {

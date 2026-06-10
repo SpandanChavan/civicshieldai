@@ -117,6 +117,9 @@ export function eventMarkerIcon(event) {
     Volcano:        '🌋',
     Landslide:      '⛰️',
     Drought:        '🏜️',
+    Heatwave:       '🌡️',
+    'Heat Wave':    '🌡️',
+    'Cold Wave':    '❄️',
     'Natural Event':'🌐',
     default:        '⚠️',
   };
