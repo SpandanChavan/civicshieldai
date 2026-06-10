@@ -65,6 +65,8 @@ const useAppStore = create((set, get) => ({
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   activePanel: 'events',  // 'events' | 'alerts' | 'resources' | 'incidents'
   setActivePanel: (panel) => set({ activePanel: panel }),
+  language: 'en',         // 🌐 'en' | 'hi'
+  setLanguage: (lang) => set({ language: lang }),
 
   // ── Realtime Connection ──────────────────────────────
   isConnected: false,

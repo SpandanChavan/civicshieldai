@@ -1,6 +1,7 @@
 import { useState, Component } from 'react';
 import DisasterMap from '@/components/map/DisasterMap';
 import MapLayers from '@/components/map/MapLayers';
+import IMDLegend from '@/components/map/IMDLegend';
 import { useDisasterEvents } from '@/hooks/useDisasterEvents';
 
 // ── Verbose Error Boundary — shows error in DOM so it's debuggable ──────────
@@ -56,6 +57,10 @@ export default function CoordinatorDashboardPage() {
           <DisasterMap onEventSelect={setSelectedEvent} />
         </ErrorBoundary>
         <MapLayers />
+        {/* 🌦️ IMD Legend bottom-left */}
+        <div className="absolute bottom-4 left-4 z-[1000] pointer-events-auto">
+          <IMDLegend />
+        </div>
         <div className="absolute top-4 right-4 z-[1000]">
           <div className="glass rounded-xl px-4 py-2 text-xs text-slate-400 border border-white/5">
             🗺️ OpenStreetMap · Real-time · No API key

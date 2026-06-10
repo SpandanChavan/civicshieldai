@@ -4,11 +4,16 @@ import { useAlerts } from '@/hooks/useAlerts';
 import AlertCard from '@/components/alerts/AlertCard';
 import AlertForm from '@/components/alerts/AlertForm';
 import ResourcePanel from '@/components/resources/ResourcePanel';
+import NDRFPanel from '@/components/resources/NDRFPanel';
+import MonsoonDashboard from '@/components/dashboard/MonsoonDashboard';
+import { useTranslation } from '@/utils/i18n';
 
 const PANELS = [
   { id: 'events',    label: '🗺️ Events',    desc: 'Active Incidents' },
   { id: 'alerts',    label: '🚨 Alerts',    desc: 'Send Notifications' },
   { id: 'resources', label: '🚑 Resources', desc: 'Manage Assets' },
+  { id: 'monsoon',   label: '🌧️ Monsoon',  desc: 'Season Dashboard' },
+  { id: 'ndrf',      label: '🪖 NDRF',     desc: 'Emergency Contacts' },
 ];
 
 export default function CoordinatorDashboard({ compact = false }) {
@@ -136,6 +141,8 @@ export default function CoordinatorDashboard({ compact = false }) {
         )}
 
         {activePanel === 'resources' && <ResourcePanel />}
+        {activePanel === 'monsoon'   && <MonsoonDashboard />}
+        {activePanel === 'ndrf'      && <NDRFPanel />}
       </div>
     </div>
   );
