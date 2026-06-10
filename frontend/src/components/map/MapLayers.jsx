@@ -128,15 +128,16 @@ export default function MapLayers() {
       <div className="glass rounded-xl p-3">
         <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-2">Layers</p>
         {[
-          { key: 'showClusters',  label: 'Cluster Markers' },
-          { key: 'showResources', label: 'Resources' },
-          { key: 'showHeatmap',   label: 'Heat Map' },
+          { key: 'showClusters',    label: 'Cluster Markers' },
+          { key: 'showResources',   label: 'Resources' },
+          { key: 'showHeatmap',     label: 'Heat Map' },
+          { key: 'showSeismicZones',label: '🏔️ Seismic Zones' },
         ].map(({ key, label }) => (
           <label key={key} className="flex items-center gap-2 cursor-pointer py-1">
             <input
               id={`toggle-${key}`}
               type="checkbox"
-              checked={filters[key]}
+              checked={filters[key] ?? (key === 'showSeismicZones' ? true : filters[key])}
               onChange={(e) => setFilter(key, e.target.checked)}
               className="accent-brand-500 w-4 h-4"
             />

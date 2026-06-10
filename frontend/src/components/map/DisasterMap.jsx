@@ -6,6 +6,7 @@ import { getEventLatLon, eventMarkerIcon } from '@/utils/geoHelpers';
 import { timeAgo } from '@/utils/formatDate';
 import { routingApi } from '@/services/backendApi';
 import IndiaMapLayer from './IndiaMapLayer';
+import SeismicZoneLayer from './SeismicZoneLayer';
 
 // ── Fix Leaflet default marker icon paths for Vite ──
 // MUST be done before any L.map() call
@@ -169,8 +170,10 @@ export default function DisasterMap({ onEventSelect }) {
         style={{ height: '100%', width: '100%' }}
         aria-label="Disaster event map"
       />
-      {/* 🇮🇳 India state boundaries layer — renders imperatively into Leaflet */}
+      {/* 🇮🇳 India state boundaries */}
       {mapReady && <IndiaMapLayer map={mapInstance.current} />}
+      {/* 🏔️ BIS Seismic zone overlay */}
+      {mapReady && <SeismicZoneLayer map={mapInstance.current} visible={filters.showSeismicZones !== false} />}
     </div>
   );
 }

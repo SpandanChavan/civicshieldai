@@ -5,6 +5,8 @@ const { fetchFireHotspots } = require('../services/nasaFirms');
 const { fetchGdacsAlerts, fetchEonetEvents } = require('../services/gdacs');
 const { fetchIndiaAlerts } = require('../services/india-alerts'); // 🇮🇳 GDACS India BBox + FloodList
 const { fetchImdAlerts } = require('../services/imd');            // 🇮🇳 IMD Open-Meteo hazards
+const { fetchNCSEarthquakes } = require('../services/ncs');       // 🇮🇳 NCS India Seismology
+const { fetchCWCFloodData } = require('../services/cwc');         // 🇮🇳 CWC River Flood Data
 
 let supabase;
 
@@ -121,24 +123,50 @@ function startCronJobs(io) {
     }
   });
 
+  // 🇮🇳 ── NCS India Earthquakes every 5 min ──
+  cron.schedule('2,7,12,17,22,27,32,37,42,47,52,57 * * * *', async () => {
+    console.log('[Cron] Polling NCS India earthquakes...');
+    try {
+      const events = await fetchNCSEarthquakes(3.0, 1);
+      if (events.length > 0) await upsertEvents(events, io, 'NCS-Earthquake');
+    } catch (e) {
+      console.error('[Cron] NCS poll error:', e.message);
+    }
+  });
+
+  // 🇮🇳 ── CWC River Flood Data every 30 min ──
+  cron.schedule('15,45 * * * *', async () => {
+    console.log('[Cron] Polling CWC river flood data...');
+    try {
+      const events = await fetchCWCFloodData();
+      if (events.length > 0) await upsertEvents(events, io, 'CWC-Flood');
+    } catch (e) {
+      console.error('[Cron] CWC poll error:', e.message);
+    }
+  });
+
   // Run initial fetch immediately on startup
   setTimeout(async () => {
     console.log('[Cron] Running initial data fetch on startup...');
     try {
-      const [quakes, fires, gdacs, eonet, india, imd] = await Promise.allSettled([
+      const [quakes, fires, gdacs, eonet, india, imd, ncs, cwc] = await Promise.allSettled([
         fetchEarthquakes(4.0, 24),
         fetchFireHotspots(),
         fetchGdacsAlerts(),
         fetchEonetEvents(),
-        fetchIndiaAlerts(),  // 🇮🇳 India (GDACS BBox + FloodList)
-        fetchImdAlerts(),    // 🇮🇳 IMD weather hazards
+        fetchIndiaAlerts(),      // 🇮🇳 India (GDACS BBox + FloodList)
+        fetchImdAlerts(),        // 🇮🇳 IMD weather hazards
+        fetchNCSEarthquakes(3.5, 7), // 🇮🇳 NCS India earthquakes (last 7 days)
+        fetchCWCFloodData(),     // 🇮🇳 CWC river flood data
       ]);
       if (quakes.value)  await upsertEvents(quakes.value,  io, 'Earthquake');
       if (fires.value)   await upsertEvents(fires.value,   io, 'Wildfire');
       if (gdacs.value)   await upsertEvents(gdacs.value,   io, 'GDACS');
       if (eonet.value)   await upsertEvents(eonet.value,   io, 'EONET');
       if (india.value && india.value.length) await upsertEvents(india.value, io, 'India');
-      if (imd.value && imd.value.length) await upsertEvents(imd.value, io, 'IMD');
+      if (imd.value   && imd.value.length)   await upsertEvents(imd.value,   io, 'IMD');
+      if (ncs.value   && ncs.value.length)   await upsertEvents(ncs.value,   io, 'NCS-Earthquake');
+      if (cwc.value   && cwc.value.length)   await upsertEvents(cwc.value,   io, 'CWC-Flood');
     } catch (e) {
       console.error('[Cron] Initial fetch error:', e.message);
     }
