@@ -1,9 +1,10 @@
 const { Resend } = require('resend');
 const { Telegraf } = require('telegraf');
 const axios = require('axios');
+const twilio = require('twilio');
 
 // Initialize clients lazily (only when keys are present)
-let resend, telegram;
+let resend, telegram, twilioClient;
 
 function getResend() {
   if (!resend && process.env.RESEND_API_KEY) {
@@ -17,6 +18,13 @@ function getTelegram() {
     telegram = new Telegraf(process.env.TELEGRAM_BOT_TOKEN);
   }
   return telegram;
+}
+
+function getTwilio() {
+  if (!twilioClient && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+    twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  }
+  return twilioClient;
 }
 
 // ── Email via Resend ─────────────────────────────────
@@ -51,6 +59,31 @@ async function sendTelegram(chatId, message) {
     return await bot.telegram.sendMessage(chatId, message, { parse_mode: 'HTML' });
   } catch (e) {
     console.error('[Notifications] Telegram send failed:', e.message);
+    throw e;
+  }
+}
+
+// ── WhatsApp via Twilio ──────────────────────────────
+async function sendWhatsApp(to, message) {
+  const client = getTwilio();
+  if (!client) {
+    console.warn('[Notifications] TWILIO credentials not set — skipping WhatsApp');
+    return { skipped: true };
+  }
+  try {
+    const from = process.env.TWILIO_WHATSAPP_NUMBER || 'whatsapp:+14155238886'; // default twilio sandbox number
+    
+    // Ensure the to number has the 'whatsapp:' prefix
+    const toFormatted = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`;
+    
+    const result = await client.messages.create({
+      body: message,
+      from,
+      to: toFormatted
+    });
+    return result;
+  } catch (e) {
+    console.error('[Notifications] WhatsApp send failed:', e.message);
     throw e;
   }
 }
@@ -120,6 +153,18 @@ async function routeAlert(alert, channels = [], recipients = {}) {
     }
   }
 
+  if (channels.includes('whatsapp') && recipients.whatsappNumbers?.length > 0) {
+    const waMsg = `🚨 *[${alert.severity}] ${alert.title}*\n\n${alert.body}\n\n_CivicShield AI_`;
+    for (const num of recipients.whatsappNumbers) {
+      try {
+        const res = await sendWhatsApp(num, waMsg);
+        results.push({ channel: 'whatsapp', recipient: num, success: true, data: res.sid });
+      } catch (e) {
+        results.push({ channel: 'whatsapp', recipient: num, success: false, error: e.message });
+      }
+    }
+  }
+
   // Multilingual translation variants
   if (channels.includes('multilingual')) {
     const translations = await Promise.allSettled(
@@ -138,4 +183,4 @@ async function routeAlert(alert, channels = [], recipients = {}) {
   return results;
 }
 
-module.exports = { sendEmail, sendTelegram, translateText, routeAlert };
+module.exports = { sendEmail, sendTelegram, sendWhatsApp, translateText, routeAlert };
