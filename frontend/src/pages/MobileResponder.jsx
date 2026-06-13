@@ -43,10 +43,26 @@ export default function MobileResponder() {
   const handleReport = (e) => {
     e.preventDefault();
     if (!reportForm.description || !reportForm.lat || !reportForm.lon) return;
-    submitMutation.mutate({
+    
+    const payload = {
       description: reportForm.description,
       location: { lat: parseFloat(reportForm.lat), lon: parseFloat(reportForm.lon) },
-    });
+    };
+
+    if (!navigator.onLine) {
+      saveOfflineIncident(payload)
+        .then(() => {
+          if ('serviceWorker' in navigator && 'SyncManager' in window) {
+            navigator.serviceWorker.ready.then((reg) => reg.sync.register('sync-incidents'));
+          }
+          setReportStatus('offline-queued');
+          setReportForm({ description: '', lat: '', lon: '' });
+        })
+        .catch((err) => setReportStatus(`error:${err.message}`));
+      return;
+    }
+
+    submitMutation.mutate(payload);
   };
 
   const criticalEvents = events.filter(e => e.severity === 'Critical');
@@ -120,8 +136,22 @@ export default function MobileResponder() {
                 <p className="text-xs text-slate-400 mt-1">Operations team has been notified</p>
               </div>
             )}
+            
+            {reportStatus === 'offline-queued' && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 text-center animate-fade-in">
+                <div className="text-3xl mb-2">📡</div>
+                <p className="text-amber-400 font-semibold">You are offline</p>
+                <p className="text-xs text-slate-400 mt-1">Report saved securely and will sync automatically when connection is restored.</p>
+              </div>
+            )}
 
-            {!reportStatus && (
+            {reportStatus?.startsWith('error:') && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-center animate-fade-in mb-4">
+                <p className="text-red-400 font-semibold text-sm">{reportStatus.replace('error:', '')}</p>
+              </div>
+            )}
+
+            {(!reportStatus || reportStatus.startsWith('error:')) && (
               <form id="incident-report-form" onSubmit={handleReport} className="space-y-4">
                 <div>
                   <label htmlFor="incident-desc" className="block text-xs font-medium text-slate-400 mb-1">
@@ -217,4 +247,26 @@ function ChecklistItem({ label }) {
       </span>
     </label>
   );
+}
+
+function saveOfflineIncident(data) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open('civicshield-offline', 1);
+    
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore('pending-incidents', { keyPath: 'id', autoIncrement: true });
+    };
+    
+    request.onsuccess = () => {
+      const db = request.result;
+      const tx = db.transaction('pending-incidents', 'readwrite');
+      const store = tx.objectStore('pending-incidents');
+      const addReq = store.add({ data });
+      
+      addReq.onsuccess = () => resolve();
+      addReq.onerror = () => reject(addReq.error);
+    };
+    
+    request.onerror = () => reject(request.error);
+  });
 }

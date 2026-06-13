@@ -127,17 +127,47 @@ self.addEventListener('sync', (event) => {
   }
 });
 
+function getAllPending(db) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('pending-incidents', 'readonly');
+    const store = tx.objectStore('pending-incidents');
+    const req = store.getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function deletePending(db, id) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('pending-incidents', 'readwrite');
+    const store = tx.objectStore('pending-incidents');
+    const req = store.delete(id);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
 async function syncPendingIncidents() {
   try {
     const db = await openDB();
-    const pending = await db.getAll('pending-incidents');
+    const pending = await getAllPending(db);
+    
     for (const incident of pending) {
-      await fetch('/api/incidents', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(incident.data),
-      });
-      await db.delete('pending-incidents', incident.id);
+      try {
+        const response = await fetch('/api/incidents', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(incident.data),
+        });
+        
+        if (response.ok || (response.status >= 400 && response.status < 500)) {
+          await deletePending(db, incident.id);
+        } else {
+          console.warn('[SW] Server error syncing incident, will retry later:', response.status);
+        }
+      } catch (err) {
+        console.error('[SW] Network error syncing incident:', err);
+      }
     }
   } catch (e) {
     console.error('[SW] Background sync failed:', e);
