@@ -2,9 +2,11 @@ const { Resend } = require('resend');
 const { Telegraf } = require('telegraf');
 const axios = require('axios');
 const twilio = require('twilio');
+const webpush = require('web-push');
+const { createClient } = require('@supabase/supabase-js');
 
 // Initialize clients lazily (only when keys are present)
-let resend, telegram, twilioClient;
+let resend, telegram, twilioClient, supabase;
 
 function getResend() {
   if (!resend && process.env.RESEND_API_KEY) {
@@ -25,6 +27,25 @@ function getTwilio() {
     twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
   }
   return twilioClient;
+}
+
+function getSupabase() {
+  if (!supabase && process.env.SUPABASE_URL) {
+    supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+  }
+  return supabase;
+}
+
+function initWebPush() {
+  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    webpush.setVapidDetails(
+      'mailto:alerts@civicshield.ai',
+      process.env.VAPID_PUBLIC_KEY,
+      process.env.VAPID_PRIVATE_KEY
+    );
+    return true;
+  }
+  return false;
 }
 
 // ── Email via Resend ─────────────────────────────────
@@ -84,6 +105,55 @@ async function sendWhatsApp(to, message) {
     return result;
   } catch (e) {
     console.error('[Notifications] WhatsApp send failed:', e.message);
+    throw e;
+  }
+}
+
+// ── SMS via Twilio ───────────────────────────────────
+async function sendSMS(to, message) {
+  const client = getTwilio();
+  if (!client) {
+    console.warn('[Notifications] TWILIO credentials not set — skipping SMS');
+    return { skipped: true };
+  }
+  try {
+    // Assuming the Twilio WhatsApp number or another number is used for SMS
+    const from = process.env.TWILIO_SMS_NUMBER || process.env.TWILIO_WHATSAPP_NUMBER || '+14155238886'; 
+    const result = await client.messages.create({
+      body: message,
+      from,
+      to
+    });
+    return result;
+  } catch (e) {
+    console.error('[Notifications] SMS send failed:', e.message);
+    throw e;
+  }
+}
+
+// ── Web Push ──────────────────────────────────────────
+async function sendWebPush(title, body, severity) {
+  if (!initWebPush()) {
+    console.warn('[Notifications] VAPID keys not set — skipping Web Push');
+    return { skipped: true };
+  }
+  
+  const db = getSupabase();
+  if (!db) return { skipped: true, error: 'No DB' };
+
+  try {
+    const { data: subs, error } = await db.from('push_subscriptions').select('*');
+    if (error) throw error;
+    if (!subs || subs.length === 0) return { skipped: true, reason: 'No subscriptions' };
+
+    const payload = JSON.stringify({ title, body, severity });
+    const results = await Promise.allSettled(
+      subs.map((sub) => webpush.sendNotification(sub, payload))
+    );
+    
+    return { successCount: results.filter(r => r.status === 'fulfilled').length, total: subs.length };
+  } catch (e) {
+    console.error('[Notifications] Web Push failed:', e.message);
     throw e;
   }
 }
@@ -165,6 +235,27 @@ async function routeAlert(alert, channels = [], recipients = {}) {
     }
   }
 
+  if (channels.includes('sms') && recipients.smsNumbers?.length > 0) {
+    const smsMsg = `🚨 [${alert.severity}] ${alert.title}\n\n${alert.body}\n\n- CivicShield AI`;
+    for (const num of recipients.smsNumbers) {
+      try {
+        const res = await sendSMS(num, smsMsg);
+        results.push({ channel: 'sms', recipient: num, success: true, data: res.sid });
+      } catch (e) {
+        results.push({ channel: 'sms', recipient: num, success: false, error: e.message });
+      }
+    }
+  }
+
+  if (channels.includes('web_push')) {
+    try {
+      const res = await sendWebPush(alert.title, alert.body, alert.severity);
+      results.push({ channel: 'web_push', recipient: 'all', success: !res.skipped, data: res });
+    } catch (e) {
+      results.push({ channel: 'web_push', recipient: 'all', success: false, error: e.message });
+    }
+  }
+
   // Multilingual translation variants
   if (channels.includes('multilingual')) {
     const translations = await Promise.allSettled(
@@ -183,4 +274,4 @@ async function routeAlert(alert, channels = [], recipients = {}) {
   return results;
 }
 
-module.exports = { sendEmail, sendTelegram, sendWhatsApp, translateText, routeAlert };
+module.exports = { sendEmail, sendTelegram, sendWhatsApp, sendSMS, sendWebPush, translateText, routeAlert };

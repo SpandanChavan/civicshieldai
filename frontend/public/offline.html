@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CivicShield AI — Offline</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #0a0f1e;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .container {
+      text-align: center;
+      max-width: 480px;
+    }
+
+    .shield {
+      font-size: 5rem;
+      margin-bottom: 1.5rem;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.7; transform: scale(0.96); }
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      font-size: 1rem;
+      color: #64748b;
+      margin-bottom: 2rem;
+      line-height: 1.6;
+    }
+
+    .card {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      backdrop-filter: blur(12px);
+    }
+
+    .card h2 {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #06b6d4;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 1rem;
+    }
+
+    .contact-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .contact-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.9rem;
+    }
+
+    .contact-list .name { color: #cbd5e1; }
+
+    .contact-list a {
+      color: #4d7bff;
+      font-weight: 600;
+      text-decoration: none;
+      font-size: 1rem;
+      letter-spacing: 0.02em;
+    }
+
+    .retry-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      background: linear-gradient(135deg, #4d7bff, #06b6d4);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      font-family: inherit;
+    }
+
+    .retry-btn:hover { opacity: 0.85; }
+
+    .status {
+      margin-top: 1.5rem;
+      font-size: 0.8rem;
+      color: #475569;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="shield">🛡️</div>
+    <h1>You're Offline</h1>
+    <p class="subtitle">
+      CivicShield AI requires an internet connection to display live disaster data.
+      In case of emergency, use the contacts below.
+    </p>
+
+    <div class="card">
+      <h2>🚨 India Emergency Numbers</h2>
+      <ul class="contact-list">
+        <li>
+          <span class="name">National Disaster Helpline</span>
+          <a href="tel:1078">1078</a>
+        </li>
+        <li>
+          <span class="name">Ambulance / Medical</span>
+          <a href="tel:108">108</a>
+        </li>
+        <li>
+          <span class="name">Police</span>
+          <a href="tel:100">100</a>
+        </li>
+        <li>
+          <span class="name">Fire Brigade</span>
+          <a href="tel:101">101</a>
+        </li>
+        <li>
+          <span class="name">Emergency (All Services)</span>
+          <a href="tel:112">112</a>
+        </li>
+        <li>
+          <span class="name">NDMA Control Room</span>
+          <a href="tel:011-26701728">011-26701728</a>
+        </li>
+      </ul>
+    </div>
+
+    <button class="retry-btn" onclick="window.location.reload()">
+      🔄 Try Again
+    </button>
+
+    <p class="status">Last updated: <span id="last-updated">—</span></p>
+  </div>
+
+  <script>
+    const stored = localStorage.getItem('civicshield-last-update');
+    if (stored) {
+      document.getElementById('last-updated').textContent =
+        new Date(stored).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+    }
+  </script>
+</body>
+</html>

@@ -15,48 +15,55 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: 'public',
+      filename: 'sw.js',
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png'],
-      workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/tile\.openstreetmap\.org\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'osm-tiles-cache',
-              expiration: {
-                maxEntries: 500,
-                maxAgeSeconds: 86400, // 24 hours
-              },
-            },
-          },
-          {
-            urlPattern: /^https:\/\/api\.open-meteo\.com\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'weather-api-cache',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 1800, // 30 min
-              },
-            },
-          },
-        ],
+      injectRegister: 'auto',
+      devOptions: {
+        enabled: true,
+        type: 'module',
       },
+      includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png', 'offline.html'],
       manifest: {
         name: 'CivicShield AI',
         short_name: 'CivicShield',
-        description: 'Intelligent Disaster Management Platform',
+        description: 'Intelligent Disaster Management & Early Warning Platform for India',
         theme_color: '#0f172a',
-        background_color: '#0f172a',
+        background_color: '#0a0f1e',
         display: 'standalone',
         orientation: 'any',
-        start_url: '/',
+        start_url: '/portal',
+        scope: '/',
+        lang: 'en',
+        categories: ['utilities', 'weather', 'productivity'],
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' },
+        ],
+        shortcuts: [
+          {
+            name: 'Live Map',
+            short_name: 'Map',
+            description: 'View the live disaster map',
+            url: '/portal',
+            icons: [{ src: '/icon-192.png', sizes: '192x192' }],
+          },
+          {
+            name: 'Coordinator Dashboard',
+            short_name: 'Dashboard',
+            description: 'Open the coordinator dashboard',
+            url: '/dashboard',
+            icons: [{ src: '/icon-192.png', sizes: '192x192' }],
+          },
+          {
+            name: 'Field Responder',
+            short_name: 'Responder',
+            description: 'Field agent mobile view',
+            url: '/responder',
+            icons: [{ src: '/icon-192.png', sizes: '192x192' }],
+          },
         ],
       },
     }),

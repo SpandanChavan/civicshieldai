@@ -40,6 +40,27 @@ export default function MapLayers() {
   const setFilter = useAppStore((s) => s.setFilter);
   const clearStateFilter = useAppStore((s) => s.clearStateFilter);
   const events = useAppStore((s) => s.events);
+  const setUserLocation = useAppStore((s) => s.setUserLocation);
+  
+  const handleLocateMe = () => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const loc = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+          setUserLocation(loc);
+          const map = window.__civicshieldMap;
+          if (map) {
+            map.flyTo([loc.lat, loc.lon], 10, { duration: 1.2 });
+          }
+        },
+        (err) => {
+          alert('Unable to retrieve location: ' + err.message);
+        }
+      );
+    } else {
+      alert('Geolocation is not supported by your browser');
+    }
+  };
 
   return (
     <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2 pointer-events-auto" style={{ maxWidth: 200 }}>
@@ -77,6 +98,14 @@ export default function MapLayers() {
           className="glass rounded-xl px-3 py-2 text-xs text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-2"
         >
           🇮🇳 India
+        </button>
+        <button
+          id="btn-locate-me"
+          onClick={handleLocateMe}
+          title="Find My Location"
+          className="glass rounded-xl px-3 py-2 text-xs text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-2"
+        >
+          📍 Locate Me
         </button>
       </div>
 

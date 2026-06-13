@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const CHANNELS = ['web_push', 'whatsapp', 'email', 'telegram', 'multilingual'];
+const CHANNELS = ['web_push', 'whatsapp', 'sms', 'email', 'telegram', 'multilingual'];
 const SEVERITIES = ['Low', 'Medium', 'High', 'Critical'];
 
 export default function AlertForm({ eventId, onSuccess, createAlert, isCreating }) {
@@ -10,7 +10,7 @@ export default function AlertForm({ eventId, onSuccess, createAlert, isCreating 
     severity: 'Medium',
     channels: ['web_push'],
     event_id: eventId || '',
-    recipients: { emails: '', telegramChatIds: '', whatsappNumbers: '' },
+    recipients: { emails: '', telegramChatIds: '', whatsappNumbers: '', smsNumbers: '' },
   });
   const [error, setError] = useState('');
 
@@ -39,12 +39,13 @@ export default function AlertForm({ eventId, onSuccess, createAlert, isCreating 
         emails: form.recipients.emails.split(',').map(s => s.trim()).filter(Boolean),
         telegramChatIds: form.recipients.telegramChatIds.split(',').map(s => s.trim()).filter(Boolean),
         whatsappNumbers: form.recipients.whatsappNumbers.split(',').map(s => s.trim()).filter(Boolean),
+        smsNumbers: form.recipients.smsNumbers.split(',').map(s => s.trim()).filter(Boolean),
       },
     };
 
     createAlert(payload, {
       onSuccess: () => {
-        setForm({ title: '', body: '', severity: 'Medium', channels: ['web_push'], event_id: '', recipients: { emails: '', telegramChatIds: '', whatsappNumbers: '' } });
+        setForm({ title: '', body: '', severity: 'Medium', channels: ['web_push'], event_id: '', recipients: { emails: '', telegramChatIds: '', whatsappNumbers: '', smsNumbers: '' } });
         onSuccess?.();
       },
       onError: (err) => setError(err.message),
@@ -164,6 +165,21 @@ export default function AlertForm({ eventId, onSuccess, createAlert, isCreating 
             placeholder="+919876543210, +14155552671"
             value={form.recipients.whatsappNumbers}
             onChange={(e) => setForm((f) => ({ ...f, recipients: { ...f.recipients, whatsappNumbers: e.target.value } }))}
+          />
+        </div>
+      )}
+
+      {form.channels.includes('sms') && (
+        <div>
+          <label htmlFor="sms-numbers" className="block text-xs font-medium text-slate-400 mb-1">
+            SMS Numbers (comma-separated with country code)
+          </label>
+          <input
+            id="sms-numbers"
+            className="input"
+            placeholder="+919876543210, +14155552671"
+            value={form.recipients.smsNumbers}
+            onChange={(e) => setForm((f) => ({ ...f, recipients: { ...f.recipients, smsNumbers: e.target.value } }))}
           />
         </div>
       )}

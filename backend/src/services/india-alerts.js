@@ -73,7 +73,6 @@ async function fetchGDACSIndia() {
       severity,
       location: { lat, lon },   // apiPollers will format as WKT
       source: 'GDACS-India',
-      external_id: String(p.eventid),
       dedup_hash: dedupHash,
       is_active: p.iscurrent !== 'false',
       detected_at: p.fromdate ? new Date(p.fromdate).toISOString() : new Date().toISOString(),
@@ -170,7 +169,6 @@ async function fetchFloodListIndia() {
       severity: 'High',
       location: { lat: jLat, lon: jLon },   // apiPollers formats as WKT
       source: 'FloodList',
-      external_id: link,
       dedup_hash: dedupHash,
       is_active: true,
       detected_at: pubDate.toISOString(),

@@ -19,6 +19,8 @@ const AlertSchema = z.object({
   recipients: z.object({
     emails: z.array(z.string().email()).optional().default([]),
     telegramChatIds: z.array(z.string()).optional().default([]),
+    whatsappNumbers: z.array(z.string()).optional().default([]),
+    smsNumbers: z.array(z.string()).optional().default([]),
   }).optional().default({}),
 });
 
@@ -54,6 +56,31 @@ router.get('/:id', async (req, res) => {
     if (!data) return res.status(404).json({ error: 'Alert not found' });
     res.json({ data });
   } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── POST /api/alerts/subscribe ────────────────────────
+router.post('/subscribe', async (req, res) => {
+  const subscription = req.body;
+  if (!subscription || !subscription.endpoint) {
+    return res.status(400).json({ error: 'Invalid subscription object' });
+  }
+
+  try {
+    const db = getDb();
+    // Upsert subscription using endpoint as the unique key
+    const { error } = await db
+      .from('push_subscriptions')
+      .upsert({
+        endpoint: subscription.endpoint,
+        keys: subscription.keys,
+      }, { onConflict: 'endpoint' });
+      
+    if (error) throw error;
+    res.status(201).json({ success: true });
+  } catch (e) {
+    console.error('[Alerts] Subscribe error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });

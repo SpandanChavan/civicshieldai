@@ -6,6 +6,8 @@ const { createServer } = require('http');
 const { Server } = require('socket.io');
 const rateLimit = require('express-rate-limit');
 const { startCronJobs } = require('./cron/apiPollers');
+const requestLogger = require('./middleware/requestLogger');
+const errorHandler  = require('./middleware/errorHandler');
 
 const app = express();
 const httpServer = createServer(app);
@@ -25,6 +27,7 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use(requestLogger);  // ← HTTP request logging w/ requestId
 
 // Global rate limiter — generous for dev; tighten in production
 app.use(rateLimit({
@@ -40,6 +43,7 @@ app.use('/api/events',    require('./routes/events'));
 app.use('/api/alerts',    require('./routes/alerts'));
 app.use('/api/resources', require('./routes/resources'));
 app.use('/api/incidents', require('./routes/incidents'));
+app.use('/api/predictions', require('./routes/predictions'));
 
 // ── Health Check ─────────────────────────────────────
 app.get('/health', (_req, res) => res.json({
@@ -50,16 +54,10 @@ app.get('/health', (_req, res) => res.json({
 }));
 
 // ── 404 handler ──────────────────────────────────────
-app.use((_req, res) => res.status(404).json({ error: 'Route not found' }));
+app.use((_req, res) => res.status(404).json({ error: true, message: 'Route not found' }));
 
-// ── Global error handler ─────────────────────────────
-app.use((err, _req, res, _next) => {
-  console.error('Unhandled error:', err);
-  res.status(err.status || 500).json({
-    error: err.message || 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
-  });
-});
+// ── Global error handler (must be LAST) ──────────────
+app.use(errorHandler);
 
 // ── Socket.io ────────────────────────────────────────
 io.on('connection', (socket) => {

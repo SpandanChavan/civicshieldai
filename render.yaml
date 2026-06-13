@@ -1,0 +1,52 @@
+services:
+  # ── Backend: Node.js / Express ────────────────────────
+  - type: web
+    name: civicshield-backend
+    runtime: node
+    repo: https://github.com/SpandanChavan/civicshieldai
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm run start
+    plan: free
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: SUPABASE_URL
+        sync: false       # Set this manually in Render dashboard
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: FRONTEND_URL
+        sync: false       # Set to your Vercel URL e.g. https://civicshieldai.vercel.app
+      - key: FIRMS_API_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_WHATSAPP_NUMBER
+        sync: false
+      - key: VAPID_PUBLIC_KEY
+        sync: false
+      - key: VAPID_PRIVATE_KEY
+        sync: false
+      - key: ML_SERVICE_URL
+        sync: false       # Set to the Render ML service URL once deployed
+
+  # ── ML Service: Python / FastAPI ─────────────────────
+  - type: web
+    name: civicshield-ml
+    runtime: python
+    repo: https://github.com/SpandanChavan/civicshieldai
+    rootDir: ml-service
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    plan: free
+    envVars:
+      - key: PORT
+        value: 8000

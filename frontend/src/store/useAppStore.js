@@ -41,6 +41,8 @@ const useAppStore = create((set, get) => ({
   mapCenter: [20.5937, 78.9629], // India
   mapZoom: 5,
   setMapView: (center, zoom) => set({ mapCenter: center, mapZoom: zoom }),
+  userLocation: null,
+  setUserLocation: (loc) => set({ userLocation: loc }),
 
   // ── Filters ─────────────────────────────────────────
   filters: {

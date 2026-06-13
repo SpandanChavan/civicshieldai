@@ -99,10 +99,8 @@ async function fetchNCSEarthquakes(minMag = 3.0, dayRange = 2) {
       severity,
       location:    { lat, lon },
       source:      'NCS-USGS',
-      external_id: f.id,
       dedup_hash:  dedupHash,
-      is_active:   true,
-      detected_at: new Date(p.time).toISOString(),
+      detected_at: new Date(f.properties.time).toISOString(),
       raw_data: {
         magnitude:   p.mag,
         depth_km:    Math.round(depth),

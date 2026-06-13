@@ -98,10 +98,8 @@ async function fetchCWCFloodData() {
       severity,
       location:    { lat, lon },
       source:      'CWC-OpenMeteo',
-      external_id: `cwc-${name}-${peakDate}`,
       dedup_hash:  dedupHash,
-      is_active:   true,
-      detected_at: new Date().toISOString(),
+      detected_at: new Date(peakDate).toISOString(),
       raw_data: {
         river,
         station:    name,

@@ -5,7 +5,7 @@ import os
 
 load_dotenv()
 
-from app.routers import predict, classify, optimize
+from app.routers import predict, classify, optimize, india
 
 app = FastAPI(
     title="CivicShield ML Service",
@@ -27,6 +27,7 @@ app.add_middleware(
 app.include_router(predict.router,  prefix="/predict",  tags=["Prediction"])
 app.include_router(classify.router, prefix="/classify", tags=["Classification"])
 app.include_router(optimize.router, prefix="/optimize", tags=["Optimization"])
+app.include_router(india.router,    prefix="/india",    tags=["India AI"])
 
 
 @app.get("/health", tags=["Health"])

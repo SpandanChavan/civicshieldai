@@ -6,6 +6,9 @@ import AlertForm from '@/components/alerts/AlertForm';
 import ResourcePanel from '@/components/resources/ResourcePanel';
 import NDRFPanel from '@/components/resources/NDRFPanel';
 import MonsoonDashboard from '@/components/dashboard/MonsoonDashboard';
+import MisinformationPanel from '@/components/dashboard/MisinformationPanel';
+import LoadingSpinner from '@/components/shared/LoadingSpinner';
+import EmptyState from '@/components/shared/EmptyState';
 import { useTranslation } from '@/utils/i18n';
 
 const PANELS = [
@@ -14,6 +17,7 @@ const PANELS = [
   { id: 'resources', label: '🚑 Resources', desc: 'Manage Assets' },
   { id: 'monsoon',   label: '🌧️ Monsoon',  desc: 'Season Dashboard' },
   { id: 'ndrf',      label: '🪖 NDRF',     desc: 'Emergency Contacts' },
+  { id: 'misinfo',   label: '🔍 Fact-Check', desc: 'Misinformation Detection' },
 ];
 
 export default function CoordinatorDashboard({ compact = false }) {
@@ -73,12 +77,9 @@ export default function CoordinatorDashboard({ compact = false }) {
         {activePanel === 'events' && (
           <div className="space-y-2">
             {eventsLoading ? (
-              <div className="flex justify-center py-12"><div className="spinner" /></div>
+              <LoadingSpinner label="Fetching live events…" />
             ) : events.length === 0 ? (
-              <div className="text-center py-12 text-slate-500">
-                <div className="text-4xl mb-3">📡</div>
-                <p className="text-sm">Monitoring for events…</p>
-              </div>
+              <EmptyState type="empty" icon="📡" title="Monitoring for events…" message="Data will appear here as disasters are detected." />
             ) : (
               events.slice(0, 50).map(event => (
                 <AlertCard
@@ -115,7 +116,7 @@ export default function CoordinatorDashboard({ compact = false }) {
             <div>
               <h3 className="text-sm font-semibold text-slate-400 mb-2">Recent Alerts</h3>
               {alertsLoading ? (
-                <div className="flex justify-center py-4"><div className="spinner" /></div>
+                <LoadingSpinner size="sm" label="Loading alerts…" />
               ) : (
                 <div className="space-y-2">
                   {alerts.slice(0, 20).map(alert => (
@@ -132,7 +133,7 @@ export default function CoordinatorDashboard({ compact = false }) {
                     </div>
                   ))}
                   {alerts.length === 0 && (
-                    <p className="text-center text-slate-500 text-sm py-4">No alerts sent yet</p>
+                    <EmptyState type="empty" icon="📨" title="No alerts sent yet" />
                   )}
                 </div>
               )}
@@ -143,6 +144,7 @@ export default function CoordinatorDashboard({ compact = false }) {
         {activePanel === 'resources' && <ResourcePanel />}
         {activePanel === 'monsoon'   && <MonsoonDashboard />}
         {activePanel === 'ndrf'      && <NDRFPanel />}
+        {activePanel === 'misinfo'   && <MisinformationPanel />}
       </div>
     </div>
   );

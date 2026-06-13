@@ -7,6 +7,7 @@ const { fetchIndiaAlerts } = require('../services/india-alerts'); // 🇮🇳 GD
 const { fetchImdAlerts } = require('../services/imd');            // 🇮🇳 IMD Open-Meteo hazards
 const { fetchNCSEarthquakes } = require('../services/ncs');       // 🇮🇳 NCS India Seismology
 const { fetchCWCFloodData } = require('../services/cwc');         // 🇮🇳 CWC River Flood Data
+const { routeAlert } = require('../services/notificationRouter');
 
 let supabase;
 
@@ -39,7 +40,7 @@ async function upsertEvents(events, io, eventType) {
   const { error, data } = await db
     .from('events')
     .upsert(formatted, { onConflict: 'dedup_hash', ignoreDuplicates: false })
-    .select('id');
+    .select('*');
 
   if (error) {
     console.error(`[Cron] Upsert error for ${eventType}:`, error.message);
@@ -48,6 +49,42 @@ async function upsertEvents(events, io, eventType) {
 
   console.log(`[Cron] ${eventType}: upserted ${data?.length || 0} events`);
   io.emit('events:updated', { type: eventType, count: data?.length || 0 });
+
+  // Auto-alerting for India-specific high/critical events (Proxy for SACHET)
+  if (eventType === 'India' && data?.length > 0) {
+    const newCriticalEvents = data.filter((e) => {
+      const isHighSeverity = e.severity === 'Critical' || e.severity === 'High';
+      const isNew = new Date(e.updated_at).getTime() - new Date(e.created_at).getTime() < 1000;
+      return isHighSeverity && isNew;
+    });
+
+    for (const ev of newCriticalEvents) {
+      console.log(`[Cron] Auto-dispatching alert for ${ev.title}`);
+      
+      const alertPayload = {
+        title: ev.title,
+        body: ev.description,
+        severity: ev.severity,
+        status: 'sending'
+      };
+
+      // Create an alert record
+      const { data: alertRecord } = await db.from('alerts').insert(alertPayload).select().single();
+      
+      if (alertRecord) {
+        // Send via all channels. We use default env var recipients since it's automated.
+        // In a real app, you'd fetch subscribed users based on region.
+        const recipients = {
+          telegramChatIds: process.env.DEFAULT_TELEGRAM_CHAT_ID ? [process.env.DEFAULT_TELEGRAM_CHAT_ID] : [],
+          whatsappNumbers: process.env.DEFAULT_WHATSAPP_NUMBER ? [process.env.DEFAULT_WHATSAPP_NUMBER] : [],
+          smsNumbers: process.env.DEFAULT_SMS_NUMBER ? [process.env.DEFAULT_SMS_NUMBER] : [],
+        };
+        
+        await routeAlert(alertRecord, ['telegram', 'whatsapp', 'sms', 'web_push'], recipients);
+        await db.from('alerts').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', alertRecord.id);
+      }
+    }
+  }
 }
 
 /**
@@ -173,6 +210,20 @@ function startCronJobs(io) {
   }, 3000);
 
   console.log('[Cron] All cron jobs scheduled ✅');
+
+  // ── Keep-alive ping for Render free tier (ML service sleeps after 15min) ──
+  if (process.env.NODE_ENV === 'production' && process.env.ML_SERVICE_URL) {
+    const axios = require('axios');
+    cron.schedule('*/14 * * * *', async () => {
+      try {
+        await axios.get(`${process.env.ML_SERVICE_URL}/health`, { timeout: 5000 });
+        console.log('[Cron] ML service keep-alive ping ✅');
+      } catch (e) {
+        console.warn('[Cron] ML service keep-alive failed:', e.message);
+      }
+    });
+    console.log('[Cron] ML keep-alive ping scheduled (every 14 min) ✅');
+  }
 }
 
 module.exports = { startCronJobs };

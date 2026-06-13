@@ -1,18 +1,20 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DisasterMap from '@/components/map/DisasterMap';
 import MapLayers from '@/components/map/MapLayers';
 import IMDLegend from '@/components/map/IMDLegend';
 import AlertCard from '@/components/alerts/AlertCard';
 import NDRFPanel from '@/components/resources/NDRFPanel';
 import MonsoonDashboard from '@/components/dashboard/MonsoonDashboard';
+import MisinformationPanel from '@/components/dashboard/MisinformationPanel';
 import { useDisasterEvents } from '@/hooks/useDisasterEvents';
 import useAppStore from '@/store/useAppStore';
 import { useTranslation } from '@/utils/i18n';
 
 const TABS = [
-  { key: 'events',   icon: '🚨', label: 'sidebar.alerts'    },
-  { key: 'monsoon',  icon: '🌧️', label: 'monsoon.active'    },
-  { key: 'ndrf',     icon: '🚒', label: 'ndrf.title'        },
+  { key: 'events',    icon: '🚨', label: 'sidebar.alerts'    },
+  { key: 'monsoon',   icon: '🌧️', label: 'monsoon.active'    },
+  { key: 'ndrf',      icon: '🚒', label: 'ndrf.title'        },
+  { key: 'factcheck', icon: '🔍', label: 'Fact-Check'         },
 ];
 
 export default function PublicPortal() {
@@ -24,6 +26,22 @@ export default function PublicPortal() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [sidebarOpen, setSidebarOpen]     = useState(true);
   const [activeTab, setActiveTab]         = useState('events');
+
+  const setUserLocation = useAppStore((s) => s.setUserLocation);
+
+  // Ask for location on mount
+  useEffect(() => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setUserLocation({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        },
+        (err) => {
+          console.log('User denied location access or error occurred:', err.message);
+        }
+      );
+    }
+  }, [setUserLocation]);
 
   useDisasterEvents();
 
@@ -135,6 +153,9 @@ export default function PublicPortal() {
 
             {/* NDRF tab */}
             {activeTab === 'ndrf' && <NDRFPanel />}
+
+            {/* Fact-Check tab */}
+            {activeTab === 'factcheck' && <MisinformationPanel />}
           </div>
         </div>
       </div>

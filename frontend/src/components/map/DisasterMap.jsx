@@ -26,6 +26,8 @@ export default function DisasterMap({ onEventSelect }) {
   const events = useAppStore((s) => s.events);
   const filters = useAppStore((s) => s.filters);
   const setSelectedEvent = useAppStore((s) => s.setSelectedEvent);
+  const userLocation = useAppStore((s) => s.userLocation);
+  const userMarkerRef = useRef(null);
 
   // ── Initialize map exactly once ──────────────────
   useEffect(() => {
@@ -133,6 +135,37 @@ export default function DisasterMap({ onEventSelect }) {
       markersRef.current[event.id] = marker;
     });
   }, [events, filters, setSelectedEvent, onEventSelect]);
+
+  // ── Render user location marker ───────────────────
+  useEffect(() => {
+    const map = mapInstance.current;
+    if (!map) return;
+
+    if (userLocation) {
+      if (!userMarkerRef.current) {
+        // Create user marker
+        const iconHtml = `
+          <div class="relative flex h-6 w-6 items-center justify-center">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-4 w-4 bg-blue-500 border-2 border-white shadow-md"></span>
+          </div>
+        `;
+        const icon = L.divIcon({
+          html: iconHtml,
+          className: '',
+          iconSize: [24, 24],
+          iconAnchor: [12, 12],
+        });
+        userMarkerRef.current = L.marker([userLocation.lat, userLocation.lon], { icon, zIndexOffset: 1000 }).addTo(map);
+        userMarkerRef.current.bindPopup('<div style="font-family:Inter;font-weight:600;font-size:12px;">📍 You are here</div>');
+      } else {
+        userMarkerRef.current.setLatLng([userLocation.lat, userLocation.lon]);
+      }
+    } else if (userMarkerRef.current) {
+      map.removeLayer(userMarkerRef.current);
+      userMarkerRef.current = null;
+    }
+  }, [userLocation]);
 
   // ── Draw evacuation route ─────────────────────────
   const drawRoute = useCallback(async (from, to) => {
