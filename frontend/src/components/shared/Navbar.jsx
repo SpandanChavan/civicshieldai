@@ -44,30 +44,32 @@ export default function Navbar() {
             <span className="relative text-xl">🛡️</span>
           </div>
           <div>
-            <span className="font-bold text-white text-sm">CivicShield</span>
-            <span className="text-brand-400 font-bold text-sm"> AI</span>
+            <span className="font-bold text-white text-sm sm:text-base">CivicShield<span className="text-brand-400"> AI</span></span>
             <span className="ml-1 text-xs text-slate-500 hidden sm:inline">🇮🇳</span>
             {criticalCount > 0 && (
               <span className="ml-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
-                {criticalCount} CRITICAL
+                {criticalCount} <span className="hidden sm:inline">CRITICAL</span>
               </span>
             )}
           </div>
         </div>
 
         {/* Navigation */}
-        <nav className="flex items-center gap-1" aria-label="Main navigation">
+        <nav className="flex items-center gap-1 sm:gap-2" aria-label="Main navigation">
           <NavLink to="/portal" className={navLinkClass} id="nav-portal">
-            {t('nav.portal')}
+            <span className="hidden sm:inline">{t('nav.portal')}</span>
+            <span className="sm:hidden text-lg" title={t('nav.portal')}>🌍</span>
           </NavLink>
           {role === 'coordinator' && (
             <NavLink to="/dashboard" className={navLinkClass} id="nav-dashboard">
-              {t('nav.dashboard')}
+              <span className="hidden sm:inline">{t('nav.dashboard')}</span>
+              <span className="sm:hidden text-lg" title={t('nav.dashboard')}>🎯</span>
             </NavLink>
           )}
           {(role === 'responder' || role === 'coordinator') && (
             <NavLink to="/responder" className={navLinkClass} id="nav-responder">
-              {t('nav.responder')}
+              <span className="hidden sm:inline">{t('nav.responder')}</span>
+              <span className="sm:hidden text-lg" title={t('nav.responder')}>📱</span>
             </NavLink>
           )}
         </nav>
@@ -81,7 +83,7 @@ export default function Navbar() {
           )}
 
           {/* Language switcher */}
-          <div className="flex items-center rounded-lg overflow-hidden border border-white/10" role="group" aria-label="Language switcher">
+          <div className="hidden sm:flex items-center rounded-lg overflow-hidden border border-white/10" role="group" aria-label="Language switcher">
             {LANGUAGES.map((lang) => (
               <button
                 key={lang.code}
@@ -130,16 +132,18 @@ export default function Navbar() {
                 onClick={handleSignOut}
                 className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all border border-white/10"
               >
-                Sign Out
+                <span className="hidden sm:inline">Sign Out</span>
+                <span className="sm:hidden">🚪</span>
               </button>
             </div>
           ) : (
             <NavLink
               to="/login"
               id="nav-signin"
-              className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-brand-600 hover:bg-brand-500 text-white transition-all"
+              className="px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white transition-all whitespace-nowrap"
             >
-              🔐 Sign In
+              <span className="hidden sm:inline">🔐 Sign In</span>
+              <span className="sm:hidden">Sign In</span>
             </NavLink>
           )}
         </div>

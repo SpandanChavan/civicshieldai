@@ -11,7 +11,7 @@
  * JavaScript in the browser. Every /cap_public_website/* endpoint returns 404.
  */
 
-const axios = require('axios');
+const axios = require('../utils/axiosClient');
 const { parseStringPromise } = require('xml2js');
 
 // ── India bounding box (WGS84) ──

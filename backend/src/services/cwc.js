@@ -14,7 +14,7 @@
  * Events are generated when forecast discharge exceeds HIGH/DANGER levels.
  */
 
-const axios = require('axios');
+const axios = require('../utils/axiosClient');
 
 // ── River gauge monitoring stations ──────────────────────────
 // [name, river, state, lat, lon, high_m3s, danger_m3s]

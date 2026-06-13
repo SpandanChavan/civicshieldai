@@ -1,6 +1,6 @@
 const { Resend } = require('resend');
 const { Telegraf } = require('telegraf');
-const axios = require('axios');
+const axios = require('../utils/axiosClient');
 const twilio = require('twilio');
 const webpush = require('web-push');
 const { createClient } = require('@supabase/supabase-js');

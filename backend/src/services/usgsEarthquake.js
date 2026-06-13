@@ -1,4 +1,4 @@
-const axios = require('axios');
+const axios = require('../utils/axiosClient');
 const { fetchWithCache } = require('./cacheService');
 
 const USGS_BASE = 'https://earthquake.usgs.gov/fdsnws/event/1/query';

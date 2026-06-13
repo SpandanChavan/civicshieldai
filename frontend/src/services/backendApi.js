@@ -1,7 +1,10 @@
 import axios from 'axios';
 
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000';
-const ML_URL = import.meta.env.VITE_ML_SERVICE_URL || 'http://localhost:8000';
+const envBackendUrl = import.meta.env.VITE_BACKEND_URL;
+const envMlUrl = import.meta.env.VITE_ML_SERVICE_URL;
+
+const BACKEND_URL = (envBackendUrl && envBackendUrl.trim() !== '') ? envBackendUrl : `http://${window.location.hostname}:4000`;
+const ML_URL = (envMlUrl && envMlUrl.trim() !== '') ? envMlUrl : `http://${window.location.hostname}:8000`;
 
 // ── Backend API Client ────────────────────────────────
 export const backendApi = axios.create({

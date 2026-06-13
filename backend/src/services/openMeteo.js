@@ -1,4 +1,4 @@
-const axios = require('axios');
+const axios = require('../utils/axiosClient');
 const { fetchWithCache } = require('./cacheService');
 
 const OPEN_METEO_BASE = 'https://api.open-meteo.com/v1/forecast';

@@ -1,4 +1,4 @@
-const axios = require('axios');
+const axios = require('../utils/axiosClient');
 const { fetchWithCache } = require('./cacheService');
 
 const FIRMS_BASE = 'https://firms.modaps.eosdis.nasa.gov/api/area/csv';

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import useAppStore from '@/store/useAppStore';
 import PinSearch from './PinSearch';
 
@@ -41,6 +42,7 @@ export default function MapLayers() {
   const clearStateFilter = useAppStore((s) => s.clearStateFilter);
   const events = useAppStore((s) => s.events);
   const setUserLocation = useAppStore((s) => s.setUserLocation);
+  const [showFilters, setShowFilters] = useState(false);
   
   const handleLocateMe = () => {
     if ('geolocation' in navigator) {
@@ -63,9 +65,19 @@ export default function MapLayers() {
   };
 
   return (
-    <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2 pointer-events-auto" style={{ maxWidth: 200 }}>
-      {/* 🇮🇳 PIN Code / City Search */}
-      <PinSearch />
+    <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2 pointer-events-auto w-[calc(100vw-32px)] md:w-auto md:max-w-[200px]">
+      <div className="flex gap-2 items-start w-full">
+        <div className="flex-1 max-w-[220px]">
+          {/* 🇮🇳 PIN Code / City Search */}
+          <PinSearch />
+        </div>
+        <button 
+          onClick={() => setShowFilters(!showFilters)}
+          className="md:hidden glass rounded-xl px-3 py-2 text-xs text-white hover:bg-white/10"
+        >
+          {showFilters ? '✕' : '⚙️ Filters'}
+        </button>
+      </div>
 
       {/* Active state filter badge */}
       {filters.stateFilter && (
@@ -109,8 +121,11 @@ export default function MapLayers() {
         </button>
       </div>
 
-      {/* Event Type Filter */}
-      <div className="glass rounded-xl p-3 min-w-[160px]">
+      {/* Filter Sections (Hidden on mobile unless toggled) */}
+      <div className={`flex flex-col gap-2 ${showFilters ? 'flex' : 'hidden md:flex'}`}>
+        
+        {/* Event Type Filter */}
+        <div className="glass rounded-xl p-3 min-w-[160px]">
         <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-2">Event Type</p>
         <div className="flex flex-col gap-1">
           {EVENT_TYPES.map((type) => (
@@ -173,6 +188,7 @@ export default function MapLayers() {
             <span className="text-sm text-slate-300">{label}</span>
           </label>
         ))}
+      </div>
       </div>
     </div>
   );

@@ -12,7 +12,7 @@
  * finer-grained domestic awareness.
  */
 
-const axios = require('axios');
+const axios = require('../utils/axiosClient');
 
 // India seismic zone thresholds (BIS IS 1893)
 const ZONE_THRESHOLDS = {

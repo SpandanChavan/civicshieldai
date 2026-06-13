@@ -71,7 +71,8 @@ export function useDisasterEvents(filters = {}) {
 
   // ── Socket.io for real-time backend pushes ─────────
   useEffect(() => {
-    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000';
+    const envUrl = import.meta.env.VITE_BACKEND_URL;
+    const backendUrl = (envUrl && envUrl.trim() !== '') ? envUrl : `http://${window.location.hostname}:4000`;
     if (!socket) {
       socket = io(backendUrl, { transports: ['websocket', 'polling'] });
     }

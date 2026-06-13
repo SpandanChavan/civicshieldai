@@ -84,10 +84,10 @@ export default function PublicPortal() {
       {/* Right sidebar */}
       <div
         className={`absolute right-0 top-0 bottom-0 z-[800] flex flex-col transition-all duration-300 ${
-          sidebarOpen ? 'w-80' : 'w-0'
+          sidebarOpen ? 'w-full sm:w-80' : 'w-0'
         } overflow-hidden`}
       >
-        <div className="glass border-l border-white/5 h-full flex flex-col w-80">
+        <div className="glass border-l border-white/5 h-full flex flex-col w-full sm:w-80">
 
           {/* Stats row */}
           <div className="grid grid-cols-2 gap-2 p-3 pb-0">

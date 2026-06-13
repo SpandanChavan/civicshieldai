@@ -211,19 +211,20 @@ function startCronJobs(io) {
 
   console.log('[Cron] All cron jobs scheduled ✅');
 
-  // ── Keep-alive ping for Render free tier (ML service sleeps after 15min) ──
-  if (process.env.NODE_ENV === 'production' && process.env.ML_SERVICE_URL) {
-    const axios = require('axios');
-    cron.schedule('*/14 * * * *', async () => {
-      try {
-        await axios.get(`${process.env.ML_SERVICE_URL}/health`, { timeout: 5000 });
-        console.log('[Cron] ML service keep-alive ping ✅');
-      } catch (e) {
-        console.warn('[Cron] ML service keep-alive failed:', e.message);
-      }
-    });
-    console.log('[Cron] ML keep-alive ping scheduled (every 14 min) ✅');
-  }
+  // ── Keep-alive ping for Render free tier (DISABLED) ──
+  // Reason: 2 services running 24/7 consumes 1,440 hours/month, exceeding the 750 free hours limit.
+  // if (process.env.NODE_ENV === 'production' && process.env.ML_SERVICE_URL) {
+  //   const axios = require('axios');
+  //   cron.schedule('*/14 * * * *', async () => {
+  //     try {
+  //       await axios.get(`${process.env.ML_SERVICE_URL}/health`, { timeout: 5000 });
+  //       console.log('[Cron] ML service keep-alive ping ✅');
+  //     } catch (e) {
+  //       console.warn('[Cron] ML service keep-alive failed:', e.message);
+  //     }
+  //   });
+  //   console.log('[Cron] ML keep-alive ping scheduled (every 14 min) ✅');
+  // }
 }
 
 module.exports = { startCronJobs };

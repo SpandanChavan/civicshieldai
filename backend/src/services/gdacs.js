@@ -1,4 +1,4 @@
-const axios = require('axios');
+const axios = require('../utils/axiosClient');
 const xml2js = require('xml2js');
 const { fetchWithCache } = require('./cacheService');
 
