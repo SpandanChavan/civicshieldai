@@ -39,7 +39,6 @@ export default function ProtectedRoute({ children, roles = [] }) {
             Your role (<span className="text-brand-400 font-semibold">{role}</span>) does not have
             permission to view this page.
           </p>
-          <Navigate to="/portal" replace />
         </div>
       </div>
     );
