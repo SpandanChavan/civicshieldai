@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { vi, describe, it, expect } from 'vitest';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter, Routes, Route } from 'react-router-dom';
 import ProtectedRoute from '../shared/ProtectedRoute';
 import * as useAuthHook from '@/hooks/useAuth';
 
@@ -8,7 +8,6 @@ import * as useAuthHook from '@/hooks/useAuth';
 vi.mock('@/hooks/useAuth');
 
 describe('ProtectedRoute', () => {
-  // ISOLATION: only loading test enabled — binary test to rule out JSDOM init as root cause
   it('renders loading spinner when checking session', () => {
     useAuthHook.useAuth.mockReturnValue({ loading: true, user: null, role: null });
     render(
@@ -21,16 +20,24 @@ describe('ProtectedRoute', () => {
     expect(screen.getByText('Checking session…')).toBeInTheDocument();
   });
 
-  it.skip('redirects to /login if not authenticated', () => {
+  // ISOLATION STEP 2: redirect test with MemoryRouter+Routes to contain Navigate
+  it('redirects to /login if not authenticated', () => {
     useAuthHook.useAuth.mockReturnValue({ loading: false, user: null, role: null });
     render(
-      <BrowserRouter>
-        <ProtectedRoute>
-          <div>Protected Content</div>
-        </ProtectedRoute>
-      </BrowserRouter>
+      <MemoryRouter initialEntries={['/protected']}>
+        <Routes>
+          <Route
+            path="/protected"
+            element={
+              <ProtectedRoute>
+                <div>Protected Content</div>
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/login" element={<div>Login Page</div>} />
+        </Routes>
+      </MemoryRouter>
     );
-    // Since we mock BrowserRouter, Navigate won't actually change URL but won't render children
     expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
   });
 
