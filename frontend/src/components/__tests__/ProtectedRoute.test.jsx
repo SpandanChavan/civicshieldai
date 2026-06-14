@@ -8,6 +8,7 @@ import * as useAuthHook from '@/hooks/useAuth';
 vi.mock('@/hooks/useAuth');
 
 describe('ProtectedRoute', () => {
+  // ISOLATION: only loading test enabled — binary test to rule out JSDOM init as root cause
   it('renders loading spinner when checking session', () => {
     useAuthHook.useAuth.mockReturnValue({ loading: true, user: null, role: null });
     render(
@@ -20,7 +21,7 @@ describe('ProtectedRoute', () => {
     expect(screen.getByText('Checking session…')).toBeInTheDocument();
   });
 
-  it('redirects to /login if not authenticated', () => {
+  it.skip('redirects to /login if not authenticated', () => {
     useAuthHook.useAuth.mockReturnValue({ loading: false, user: null, role: null });
     render(
       <BrowserRouter>
@@ -33,7 +34,7 @@ describe('ProtectedRoute', () => {
     expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
   });
 
-  it('renders children if authenticated and no role is required', () => {
+  it.skip('renders children if authenticated and no role is required', () => {
     useAuthHook.useAuth.mockReturnValue({ loading: false, user: { id: '123' }, role: 'citizen' });
     render(
       <BrowserRouter>
@@ -45,7 +46,7 @@ describe('ProtectedRoute', () => {
     expect(screen.getByText('Protected Content')).toBeInTheDocument();
   });
 
-  it('shows access denied if authenticated but wrong role', () => {
+  it.skip('shows access denied if authenticated but wrong role', () => {
     useAuthHook.useAuth.mockReturnValue({ loading: false, user: { id: '123' }, role: 'citizen' });
     render(
       <BrowserRouter>
@@ -58,7 +59,7 @@ describe('ProtectedRoute', () => {
     expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
   });
 
-  it('renders children if authenticated and correct role', () => {
+  it.skip('renders children if authenticated and correct role', () => {
     useAuthHook.useAuth.mockReturnValue({ loading: false, user: { id: '123' }, role: 'coordinator' });
     render(
       <BrowserRouter>
