@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "lint": "eslint src/ --ext .js,.jsx",
     "test": "vitest",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "test:ci": "vitest run --poolOptions.threads.singleThread=true"
   },
   "dependencies": {
     "@sentry/react": "^10.57.0",
