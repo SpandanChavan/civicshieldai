@@ -1,5 +1,9 @@
 # CivicShield AI
 
+[![Backend Tests](https://github.com/SpandanChavan/civicshieldai/actions/workflows/backend-tests.yml/badge.svg)](https://github.com/SpandanChavan/civicshieldai/actions/workflows/backend-tests.yml)
+[![Frontend Tests](https://github.com/SpandanChavan/civicshieldai/actions/workflows/frontend-tests.yml/badge.svg)](https://github.com/SpandanChavan/civicshieldai/actions/workflows/frontend-tests.yml)
+[![ML Service Tests](https://github.com/SpandanChavan/civicshieldai/actions/workflows/ml-tests.yml/badge.svg)](https://github.com/SpandanChavan/civicshieldai/actions/workflows/ml-tests.yml)
+
 **Intelligent Disaster Management Platform** — Full-stack monorepo with real-time multi-hazard monitoring, AI-powered risk analytics, multilingual alert delivery, and interactive geospatial mapping.
 
 ## Tech Stack
@@ -57,6 +61,28 @@ cd ml-service && python -m venv .venv && .venv\Scripts\activate && pip install -
 
 # Terminal C - Frontend
 cd frontend && npm install && npm run dev
+```
+
+## Testing
+
+CivicShield AI is protected by comprehensive test suites that run automatically via GitHub Actions.
+
+### Backend Tests (Mocha/Sinon)
+```bash
+cd backend
+npm test
+```
+
+### Frontend Tests (Vitest)
+```bash
+cd frontend
+npm test
+```
+
+### ML Service Tests (Pytest)
+```bash
+cd ml-service
+pytest
 ```
 
 ## Deployment

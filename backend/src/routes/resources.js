@@ -1,7 +1,7 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const { z } = require('zod');
-
+const { logAudit } = require('../utils/auditLogger');
 const router = express.Router();
 
 function getDb() {
@@ -53,6 +53,12 @@ router.post('/', async (req, res) => {
       .select()
       .single();
     if (error) throw error;
+
+    logAudit('RESOURCE_CREATED', null, data.id, { 
+      type: data.type, 
+      assigned_event: data.assigned_event 
+    });
+
     res.status(201).json({ data });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -69,6 +75,11 @@ router.patch('/:id', async (req, res) => {
       .select()
       .single();
     if (error) throw error;
+
+    if (req.body.assigned_event) {
+      logAudit('RESOURCE_ASSIGNED', null, data.id, { assigned_event: req.body.assigned_event });
+    }
+
     res.json({ data });
   } catch (e) {
     res.status(500).json({ error: e.message });

@@ -14,6 +14,8 @@
     "lint": "eslint src/ --ext .js"
   },
   "dependencies": {
+    "@sentry/node": "^10.57.0",
+    "@sentry/profiling-node": "^10.57.0",
     "@supabase/supabase-js": "^2.43.4",
     "@upstash/redis": "^1.28.4",
     "axios": "^1.6.8",
@@ -24,6 +26,7 @@
     "express-rate-limit": "^7.3.1",
     "feedparser-promised": "^2.0.1",
     "helmet": "^7.1.0",
+    "node-cache": "^5.1.2",
     "node-cron": "^3.0.3",
     "resend": "^3.2.0",
     "socket.io": "^4.7.5",

@@ -1,7 +1,8 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const { z } = require('zod');
-
+const rateLimit = require('express-rate-limit');
+const { logAudit } = require('../utils/auditLogger');
 const router = express.Router();
 
 function getDb() {
@@ -56,7 +57,13 @@ router.get('/:id', async (req, res) => {
 });
 
 // ── POST /api/incidents ───────────────────────────────
-router.post('/', async (req, res) => {
+const incidentLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 5, // max 5 incidents per IP
+  message: { error: 'Too many incident reports created from this IP, please try again after 10 minutes.' }
+});
+
+router.post('/', incidentLimiter, async (req, res) => {
   const parsed = IncidentSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
@@ -74,6 +81,14 @@ router.post('/', async (req, res) => {
       .select()
       .single();
     if (error) throw error;
+    
+    // Log audit action asynchronously
+    logAudit('INCIDENT_REPORTED', parsed.data.reporter_id || null, data.id, { 
+      status: 'pending',
+      lat: location.lat,
+      lon: location.lon
+    });
+
     res.status(201).json({ data });
   } catch (e) {
     res.status(500).json({ error: e.message });

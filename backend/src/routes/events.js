@@ -1,7 +1,7 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const { z } = require('zod');
-
+const { cacheMiddleware } = require('../middleware/cache');
 const router = express.Router();
 
 function getDb() {
@@ -39,7 +39,8 @@ function withCoords(events) {
 
 // ── GET /api/events ───────────────────────────────────
 // Query params: type, severity, limit, offset, active, mode=diverse
-router.get('/', async (req, res) => {
+// Cache for 30 seconds since events update frequently but are queried heavily
+router.get('/', cacheMiddleware(30), async (req, res) => {
   try {
     const { type, severity, limit = 100, offset = 0, active = 'true', mode } = req.query;
     const db = getDb();
@@ -86,25 +87,10 @@ router.get('/', async (req, res) => {
 });
 
 
-// ── GET /api/events/:id ───────────────────────────────
-router.get('/:id', async (req, res) => {
-  try {
-    const { data, error } = await getDb()
-      .from('events')
-      .select('*')
-      .eq('id', req.params.id)
-      .single();
-    if (error) throw error;
-    if (!data) return res.status(404).json({ error: 'Event not found' });
-    const coords = parseWkbPoint(data.location);
-    res.json({ data: coords ? { ...data, ...coords } : data });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
 // ── GET /api/events/stats/summary ────────────────────
-router.get('/stats/summary', async (req, res) => {
+// Cache summary stats for 60 seconds to reduce DB aggregation load
+// NOTE: This MUST be declared before /:id to prevent Express matching 'stats/summary' as an :id param
+router.get('/stats/summary', cacheMiddleware(60), async (req, res) => {
   try {
     const db = getDb();
     const { data, error } = await db
@@ -120,6 +106,23 @@ router.get('/stats/summary', async (req, res) => {
     }, { byType: {}, bySeverity: {}, total: data.length });
 
     res.json({ data: summary });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── GET /api/events/:id ───────────────────────────────
+router.get('/:id', async (req, res) => {
+  try {
+    const { data, error } = await getDb()
+      .from('events')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+    if (error) throw error;
+    if (!data) return res.status(404).json({ error: 'Event not found' });
+    const coords = parseWkbPoint(data.location);
+    res.json({ data: coords ? { ...data, ...coords } : data });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

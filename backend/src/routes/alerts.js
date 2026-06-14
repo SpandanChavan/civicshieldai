@@ -2,7 +2,7 @@ const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
 const { z } = require('zod');
 const { routeAlert } = require('../services/notificationRouter');
-
+const { logAudit } = require('../utils/auditLogger');
 const router = express.Router();
 
 function getDb() {
@@ -103,6 +103,13 @@ router.post('/', async (req, res) => {
       .select()
       .single();
     if (error) throw error;
+
+    // Log audit action asynchronously
+    // Alert creators don't pass an explicit reporter_id in this schema currently, so userId is null
+    logAudit('ALERT_CREATED', null, alert.id, { 
+      title: alert.title,
+      severity: alert.severity 
+    });
 
     // Send via channels asynchronously
     (async () => {

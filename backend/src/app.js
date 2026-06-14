@@ -1,5 +1,20 @@
 require('dotenv').config();
 const express = require('express');
+
+// Initialize Sentry conditionally
+if (process.env.SENTRY_DSN) {
+  const Sentry = require("@sentry/node");
+  const { nodeProfilingIntegration } = require("@sentry/profiling-node");
+
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    integrations: [
+      nodeProfilingIntegration(),
+    ],
+    tracesSampleRate: 1.0,
+    profilesSampleRate: 1.0,
+  });
+}
 const cors = require('cors');
 const helmet = require('helmet');
 const { createServer } = require('http');
@@ -47,17 +62,41 @@ app.use('/api/incidents', require('./routes/incidents'));
 app.use('/api/predictions', require('./routes/predictions'));
 
 // ── Health Check ─────────────────────────────────────
-app.get('/health', (_req, res) => res.json({
-  status: 'ok',
-  service: 'civicshield-backend',
-  version: '1.0.0',
-  timestamp: new Date().toISOString(),
-}));
+const { createClient } = require('@supabase/supabase-js');
+const axios = require('axios');
+
+app.get('/health', async (_req, res) => {
+  let dbStatus = 'disconnected';
+  let mlStatus = 'offline';
+
+  try {
+    const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
+    const { error } = await db.from('events').select('id').limit(1);
+    if (!error) dbStatus = 'connected';
+  } catch (e) {}
+
+  try {
+    if (process.env.ML_SERVICE_URL) {
+      await axios.get(`${process.env.ML_SERVICE_URL}/health`, { timeout: 3000 });
+      mlStatus = 'online';
+    }
+  } catch (e) {}
+
+  res.json({
+    status: 'ok',
+    database: dbStatus,
+    ml_service: mlStatus,
+  });
+});
 
 // ── 404 handler ──────────────────────────────────────
 app.use((_req, res) => res.status(404).json({ error: true, message: 'Route not found' }));
 
 // ── Global error handler (must be LAST) ──────────────
+if (process.env.SENTRY_DSN) {
+  const Sentry = require("@sentry/node");
+  Sentry.setupExpressErrorHandler(app);
+}
 app.use(errorHandler);
 
 // ── Socket.io ────────────────────────────────────────
