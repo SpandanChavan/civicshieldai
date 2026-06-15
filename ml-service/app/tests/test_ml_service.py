@@ -68,9 +68,10 @@ def test_optimize_routes():
         "depot": {"id": "depot", "lat": 19.076, "lon": 72.877, "name": "Mumbai HQ"},
         "destinations": [
             {"id": "loc1", "lat": 18.520, "lon": 73.856, "name": "Pune Relief Camp"},
-            {"id": "loc2", "lat": 17.381, "lon": 78.476, "name": "Hyderabad Shelter"},
+            {"id": "loc2", "lat": 19.997, "lon": 73.789, "name": "Nashik Shelter"},
         ],
-        "num_vehicles": 2
+        "num_vehicles": 2,
+        "max_distance_km": 300
     })
     assert resp.status_code == 200
     data = resp.json()
