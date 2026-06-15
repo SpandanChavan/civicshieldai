@@ -1,4 +1,4 @@
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 
 /**
  * HTTP request logger middleware.
@@ -7,7 +7,7 @@ const { v4: uuidv4 } = require('uuid');
  */
 module.exports = function requestLogger(req, res, next) {
   const start     = Date.now();
-  const requestId = uuidv4().slice(0, 8); // short 8-char id
+  const requestId = randomUUID().slice(0, 8); // short 8-char id
   req.requestId   = requestId;
 
   res.on('finish', () => {

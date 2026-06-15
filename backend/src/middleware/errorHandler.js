@@ -1,11 +1,11 @@
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 
 /**
  * Centralized error handler — must be registered LAST in app.js
  * Catches all errors passed via next(err) and returns structured JSON.
  */
 module.exports = function errorHandler(err, req, res, _next) {
-  const requestId = req.requestId || uuidv4();
+  const requestId = req.requestId || randomUUID();
   const status    = err.status || err.statusCode || 500;
   const isDev     = process.env.NODE_ENV !== 'production';
 
