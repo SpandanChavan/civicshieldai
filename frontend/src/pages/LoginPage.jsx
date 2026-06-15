@@ -51,7 +51,7 @@ export default function LoginPage() {
     const { data, error: authError } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: { data: { full_name: fullName, role: selRole } },
     });
 
     if (authError) {
@@ -60,18 +60,7 @@ export default function LoginPage() {
       return;
     }
 
-    // Set role in user_profiles (the trigger creates the row with 'citizen' by default)
-    if (data.user && selRole !== 'citizen') {
-      await supabase
-        .from('user_profiles')
-        .update({ role: selRole, full_name: fullName })
-        .eq('id', data.user.id);
-    } else if (data.user && fullName) {
-      await supabase
-        .from('user_profiles')
-        .update({ full_name: fullName })
-        .eq('id', data.user.id);
-    }
+    // Role is now passed via user_metadata and handled by the Postgres trigger.
 
     setSuccess('Account created! Check your email to confirm, then log in.');
     setMode('login');

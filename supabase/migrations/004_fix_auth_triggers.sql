@@ -37,7 +37,7 @@ BEGIN
   VALUES (
     new.id,
     new.raw_user_meta_data->>'full_name',
-    'citizen'
+    COALESCE(new.raw_user_meta_data->>'role', 'citizen')
   );
   
   INSERT INTO public.audit_logs (user_id, action_type, metadata)
