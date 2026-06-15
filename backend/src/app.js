@@ -1,4 +1,5 @@
 require('dotenv').config();
+global.WebSocket = require('ws');
 const express = require('express');
 
 // Initialize Sentry conditionally
