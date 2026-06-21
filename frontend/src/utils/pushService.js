@@ -27,7 +27,7 @@ export async function registerAndSubscribeToPush() {
     });
 
     // Send subscription to backend
-    await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:4000'}/api/alerts/subscribe`, {
+    await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000'}/api/alerts/subscribe`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

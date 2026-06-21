@@ -76,11 +76,29 @@ router.post('/', async (req, res) => {
 });
 
 // ── PATCH /api/resources/:id ──────────────────────────
+// Partial update — validate the subset of fields provided (no blind req.body spread)
+const ResourceUpdateSchema = ResourceSchema.partial().extend({
+  assigned_event: z.string().uuid().nullable().optional(),
+}).strict();
+
 router.patch('/:id', async (req, res) => {
+  const parsed = ResourceUpdateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
+  }
+
+  // Convert a {lat,lon} location (if supplied) to PostGIS WKT
+  const { location, ...rest } = parsed.data;
+  const updates = {
+    ...rest,
+    ...(location && { location: `SRID=4326;POINT(${location.lon} ${location.lat})` }),
+    updated_at: new Date().toISOString(),
+  };
+
   try {
     const { data, error } = await getDb()
       .from('resources')
-      .update({ ...req.body, updated_at: new Date().toISOString() })
+      .update(updates)
       .eq('id', req.params.id)
       .select()
       .single();

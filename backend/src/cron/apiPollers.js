@@ -25,19 +25,25 @@ async function upsertEvents(events, io, eventType) {
   if (!events.length) return;
   const db = getAdminDb(); // m5: singleton
 
+  // Resolve state_id per event (N2). Cache by rounded coords (~1km) so nearby
+  // points in the same batch don't each incur a get_state_from_point round-trip.
+  const stateCache = new Map();
+  async function resolveStateId(lat, lon) {
+    const key = `${lat.toFixed(2)},${lon.toFixed(2)}`;
+    if (stateCache.has(key)) return stateCache.get(key);
+    let state_id = null;
+    try {
+      const { data } = await db.rpc('get_state_from_point', { lat, lon });
+      if (data) state_id = data;
+    } catch (err) {}
+    stateCache.set(key, state_id);
+    return state_id;
+  }
+
   // Format location as WKT POINT for PostGIS and resolve state_id (N2 FIX)
   const formatted = [];
   for (const e of events) {
-    let state_id = null;
-    if (e.location) {
-      try {
-        const { data } = await db.rpc('get_state_from_point', {
-          lat: e.location.lat,
-          lon: e.location.lon,
-        });
-        if (data) state_id = data;
-      } catch (err) {}
-    }
+    const state_id = e.location ? await resolveStateId(e.location.lat, e.location.lon) : null;
     formatted.push({
       ...e,
       state_id,
@@ -63,25 +69,28 @@ async function upsertEvents(events, io, eventType) {
 
   // Auto-alerting for India-specific high/critical events (Proxy for SACHET)
   if (eventType === 'India' && data?.length > 0) {
+    // Deterministic (replaces the fragile updated_at−created_at<1s heuristic):
+    // alert only high/critical events that have not been alerted yet.
     const newCriticalEvents = data.filter((e) => {
       const isHighSeverity = e.severity === 'Critical' || e.severity === 'High';
-      const isNew = new Date(e.updated_at).getTime() - new Date(e.created_at).getTime() < 1000;
-      return isHighSeverity && isNew;
+      return isHighSeverity && !e.alerted_at;
     });
 
     for (const ev of newCriticalEvents) {
       console.log(`[Cron] Auto-dispatching alert for ${ev.title}`);
-      
+
       const alertPayload = {
         title: ev.title,
         body: ev.description,
         severity: ev.severity,
-        status: 'sending'
+        status: 'sending',
+        event_id: ev.id,
+        state_id: ev.state_id || null,
       };
 
       // Create an alert record
       const { data: alertRecord } = await db.from('alerts').insert(alertPayload).select().single();
-      
+
       if (alertRecord) {
         // Send via all channels. We use default env var recipients since it's automated.
         // In a real app, you'd fetch subscribed users based on region.
@@ -90,9 +99,12 @@ async function upsertEvents(events, io, eventType) {
           whatsappNumbers: process.env.DEFAULT_WHATSAPP_NUMBER ? [process.env.DEFAULT_WHATSAPP_NUMBER] : [],
           smsNumbers: process.env.DEFAULT_SMS_NUMBER ? [process.env.DEFAULT_SMS_NUMBER] : [],
         };
-        
+
         await routeAlert(alertRecord, ['telegram', 'whatsapp', 'sms', 'web_push'], recipients);
         await db.from('alerts').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', alertRecord.id);
+
+        // Stamp the event so it is never auto-alerted again (deterministic, no time heuristic)
+        await db.from('events').update({ alerted_at: new Date().toISOString() }).eq('id', ev.id);
       }
     }
   }

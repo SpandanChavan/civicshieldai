@@ -178,6 +178,19 @@ async function translateText(text, targetLang, sourceLang = 'en') {
   }
 }
 
+// ── HTML escaping (XSS hardening) ─────────────────────
+// Alert title/body can originate from user input or external feeds and are
+// interpolated into HTML email + Telegram (HTML parse_mode). Escape them so
+// markup in the content cannot inject into the message body.
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ── Alert Router ──────────────────────────────────────
 const SUPPORTED_LANGUAGES = ['hi', 'ta', 'te', 'bn', 'gu', 'mr', 'pa'];
 
@@ -190,12 +203,16 @@ const SUPPORTED_LANGUAGES = ['hi', 'ta', 'te', 'bn', 'gu', 'mr', 'pa'];
 async function routeAlert(alert, channels = [], recipients = {}) {
   const results = [];
 
+  // Escaped copies for HTML-rendering channels (email, Telegram HTML mode)
+  const safeTitle = escapeHtml(alert.title);
+  const safeBody = escapeHtml(alert.body);
+
   const alertHtml = `
     <h2 style="color:${alert.severity === 'Critical' ? '#dc2626' : '#f59e0b'}">
-      🚨 ${alert.title}
+      🚨 ${safeTitle}
     </h2>
-    <p>${alert.body}</p>
-    <p><strong>Severity:</strong> ${alert.severity}</p>
+    <p>${safeBody}</p>
+    <p><strong>Severity:</strong> ${escapeHtml(alert.severity)}</p>
     <p><em>CivicShield AI — Intelligent Disaster Management</em></p>
   `;
 
@@ -204,7 +221,7 @@ async function routeAlert(alert, channels = [], recipients = {}) {
       try {
         const res = await sendEmail({
           to: email,
-          subject: `[${alert.severity}] ${alert.title}`,
+          subject: `[${alert.severity}] ${alert.title}`.replace(/[\r\n]+/g, ' '),
           html: alertHtml,
         });
         results.push({ channel: 'email', recipient: email, success: true, data: res });
@@ -215,7 +232,7 @@ async function routeAlert(alert, channels = [], recipients = {}) {
   }
 
   if (channels.includes('telegram') && recipients.telegramChatIds?.length > 0) {
-    const telegramMsg = `🚨 <b>[${alert.severity}] ${alert.title}</b>\n\n${alert.body}`;
+    const telegramMsg = `🚨 <b>[${escapeHtml(alert.severity)}] ${safeTitle}</b>\n\n${safeBody}`;
     for (const chatId of recipients.telegramChatIds) {
       try {
         await sendTelegram(chatId, telegramMsg);
