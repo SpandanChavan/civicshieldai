@@ -39,3 +39,4 @@ htmlcov/
 # Python
 *.egg-info/
 .pytest_cache/
+frontend/public/textures/  
