@@ -86,9 +86,10 @@ async function fetchCWCFloodData() {
     const peakDate   = dates[discharges.indexOf(maxDischarge)] || dates[0];
 
     const dedupHash = `cwc-${name.toLowerCase().replace(/\s+/g, '-')}-${peakDate}`;
+    // m1 FIX: move .toLocaleString() call inside the template literal interpolation
+    const thresholdStr = (isDanger ? dangerThresh : highThresh).toLocaleString('en-IN');
     const desc = `River ${river} at ${name}, ${state} — discharge ${Math.round(maxDischarge).toLocaleString('en-IN')} m³/s ` +
-                 `exceeds ${level} level (${isDanger ? dangerThresh : highThresh}.toLocaleString('en-IN')} m³/s). ` +
-                 `Forecast peak: ${peakDate}.`;
+                 `exceeds ${level} level (${thresholdStr} m³/s). Forecast peak: ${peakDate}.`;
 
     events.push({
       title:       `${level} Alert: ${river} at ${name}, ${state}`,
@@ -119,4 +120,4 @@ async function fetchCWCFloodData() {
   return events;
 }
 
-module.exports = { fetchCWCFloodData };
+module.exports = { fetchCWCFloodData, RIVER_STATIONS };

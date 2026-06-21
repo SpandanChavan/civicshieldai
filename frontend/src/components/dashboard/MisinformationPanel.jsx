@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { backendApi } from '@/services/backendApi';
+import { CheckCircle2, AlertTriangle, XCircle, Search, Microscope, ClipboardList } from 'lucide-react';
 
 // ── Credibility Gauge (SVG ring) ──────────────────────────────────────
 function CredibilityGauge({ score }) {
@@ -45,7 +46,11 @@ function ClassBadge({ classification }) {
     'Suspicious':   'bg-amber-500/20 text-amber-300 border border-amber-500/30',
     'Likely False': 'bg-red-500/20 text-red-300 border border-red-500/30',
   };
-  const icons = { 'Likely True': '✅', 'Suspicious': '⚠️', 'Likely False': '❌' };
+  const icons = {
+    'Likely True': <CheckCircle2 size={16} />,
+    'Suspicious': <AlertTriangle size={16} />,
+    'Likely False': <XCircle size={16} />
+  };
 
   return (
     <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold ${styles[classification] || styles['Suspicious']}`}>
@@ -129,7 +134,7 @@ export default function MisinformationPanel() {
       {/* Header */}
       <div className="glass-card">
         <div className="flex items-center gap-3 mb-1">
-          <span className="text-2xl">🔍</span>
+          <Search className="text-brand-400" size={24} />
           <div>
             <h2 className="text-sm font-bold text-white">Misinformation Detector</h2>
             <p className="text-xs text-slate-400">AI-powered fact-check for disaster news</p>
@@ -170,7 +175,7 @@ export default function MisinformationPanel() {
                 Analyzing…
               </>
             ) : (
-              <>🔬 Analyze</>
+              <><Microscope size={16} /> Analyze</>
             )}
           </button>
         </div>
@@ -210,7 +215,7 @@ export default function MisinformationPanel() {
           <div className="flex justify-center py-6"><div className="spinner" /></div>
         ) : history.length === 0 ? (
           <div className="text-center py-6 text-slate-600">
-            <div className="text-3xl mb-2">📋</div>
+            <ClipboardList className="mx-auto mb-2 text-slate-500" size={32} />
             <p className="text-xs">No analyses yet</p>
           </div>
         ) : (

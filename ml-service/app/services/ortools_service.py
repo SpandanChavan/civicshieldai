@@ -145,28 +145,36 @@ def optimize_allocation(
 ) -> Dict[str, Any]:
     """
     Greedy resource allocation matching supply to demand by proximity.
+
+    M4 FIX: Resources are consumed from the pool after each assignment.
+    No resource can appear in more than one demand's assignment.
+    When supply < demand, remaining demands are correctly reported as unmet.
     """
     assignments = []
     unmet = []
 
-    available = list(resources)
+    # Build a pool of available resource IDs (consumed set tracks what's used)
+    consumed_ids: set = set()
+    available_pool = [r for r in resources if r.get("status") == "available"]
+
     for demand in demands:
         d_lat = demand.get("lat", 0)
         d_lon = demand.get("lon", 0)
         needed = demand.get("quantity", 1)
-        assigned = []
 
-        for resource in available:
-            if resource.get("status") != "available":
-                continue
-            r_lat = resource.get("lat", 0)
-            r_lon = resource.get("lon", 0)
-            dist = _haversine_km(d_lat, d_lon, r_lat, r_lon)
-            assigned.append({"resource": resource, "distance_km": round(dist, 2)})
+        # Only consider resources not yet consumed
+        candidates = [
+            {"resource": r, "distance_km": round(_haversine_km(d_lat, d_lon, r.get("lat", 0), r.get("lon", 0)), 2)}
+            for r in available_pool
+            if r.get("id") not in consumed_ids
+        ]
+        candidates.sort(key=lambda x: x["distance_km"])
 
-        assigned.sort(key=lambda x: x["distance_km"])
-        fulfilled = assigned[:needed]
+        fulfilled = candidates[:needed]
         if fulfilled:
+            # Mark these resources as consumed so they cannot be re-used
+            for a in fulfilled:
+                consumed_ids.add(a["resource"]["id"])
             assignments.append({
                 "demand_id": demand.get("id"),
                 "assigned_resources": [a["resource"]["id"] for a in fulfilled],

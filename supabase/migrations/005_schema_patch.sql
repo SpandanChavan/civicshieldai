@@ -94,6 +94,22 @@ EXCEPTION WHEN duplicate_object THEN null; END $$;
 --         (was completely unprotected)
 -- ════════════════════════════════════════════════════
 
+-- ROUND-2 FIX (PM): create the table BEFORE any ALTER/RLS touches it.
+-- Without this, a fresh `supabase db reset` aborts the WHOLE chain here,
+-- because no earlier migration ever created misinformation_checks — which
+-- meant migration 006 (and everything after) never ran on a clean DB.
+-- Idempotent: 006's CREATE TABLE IF NOT EXISTS becomes a harmless no-op.
+CREATE TABLE IF NOT EXISTS public.misinformation_checks (
+  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  input_text        TEXT        NOT NULL,
+  credibility_score INTEGER     NOT NULL DEFAULT 50,
+  classification    TEXT        NOT NULL DEFAULT 'Suspicious',
+  confidence        INTEGER     NOT NULL DEFAULT 50,
+  is_misinformation BOOLEAN     NOT NULL DEFAULT false,
+  explanation       TEXT,
+  analyzed_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
 ALTER TABLE misinformation_checks ENABLE ROW LEVEL SECURITY;
 
 DO $$ BEGIN

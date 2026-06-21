@@ -5,6 +5,7 @@ import useAppStore from '@/store/useAppStore';
 import { getEventLatLon, eventMarkerIcon } from '@/utils/geoHelpers';
 import { timeAgo } from '@/utils/formatDate';
 import { routingApi } from '@/services/backendApi';
+import { useAuth } from '@/hooks/useAuth';
 import IndiaMapLayer from './IndiaMapLayer';
 import SeismicZoneLayer from './SeismicZoneLayer';
 
@@ -17,7 +18,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-export default function DisasterMap({ onEventSelect }) {
+export default function DisasterMap({ onEventSelect, applyJurisdictionFilter = false }) {
   const mapRef = useRef(null);
   const mapInstance = useRef(null);  // Holds the L.Map instance
   const markersRef = useRef({});     // id → L.Marker
@@ -28,6 +29,7 @@ export default function DisasterMap({ onEventSelect }) {
   const setSelectedEvent = useAppStore((s) => s.setSelectedEvent);
   const userLocation = useAppStore((s) => s.userLocation);
   const userMarkerRef = useRef(null);
+  const { profile } = useAuth();
 
   // ── Initialize map exactly once ──────────────────
   useEffect(() => {
@@ -39,12 +41,13 @@ export default function DisasterMap({ onEventSelect }) {
       zoom: 5,
       zoomControl: false,
     });
+    
     window.__civicshieldMap = mapInstance.current; // expose for MapLayers fitAll
     setMapReady(true);
 
 
-    // Custom zoom control (top-right)
-    L.control.zoom({ position: 'topright' }).addTo(mapInstance.current);
+    // Custom zoom control (bottom-right)
+    L.control.zoom({ position: 'bottomright' }).addTo(mapInstance.current);
 
     // OpenStreetMap tiles — FREE, no API key, no cost ever
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -64,6 +67,21 @@ export default function DisasterMap({ onEventSelect }) {
     };
   }, []); // Empty deps — runs once
 
+  // ── Fit to coordinator's state once profile loads ──
+  // Profile is null at mount, so we need a separate effect that fires when it arrives
+  useEffect(() => {
+    const map = mapInstance.current;
+    if (!applyJurisdictionFilter || !map || !profile?.states) return;
+    const st = profile.states;
+    if (st.bbox_north && st.bbox_south && st.bbox_east && st.bbox_west) {
+      const bounds = [
+        [st.bbox_south, st.bbox_west],
+        [st.bbox_north, st.bbox_east],
+      ];
+      map.fitBounds(bounds, { padding: [40, 40], animate: true });
+    }
+  }, [profile]);
+
   // ── Update markers when events or filters change ─
   useEffect(() => {
     const map = mapInstance.current;
@@ -74,14 +92,27 @@ export default function DisasterMap({ onEventSelect }) {
       if (!e.is_active) return false;
       if (filters.eventType !== 'all' && e.event_type !== filters.eventType) return false;
       if (filters.severity !== 'all' && e.severity !== filters.severity) return false;
+      
+      const pos = getEventLatLon(e);
+      
       // 🇮🇳 India state filter — filter by bounding box of clicked state
       if (filters.stateFilter && window.__civicshieldStateFilter?.bounds) {
         const { ne, sw } = window.__civicshieldStateFilter.bounds;
-        const pos = getEventLatLon(e);
         if (pos) {
           if (pos.lat < sw.lat || pos.lat > ne.lat || pos.lon < sw.lng || pos.lon > ne.lng) return false;
         }
       }
+
+      // 🛡️ Coordinator jurisdiction filter
+      if (applyJurisdictionFilter && profile?.role === 'coordinator' && profile?.states?.bbox_north) {
+        const st = profile.states;
+        if (pos) {
+          if (pos.lat < st.bbox_south || pos.lat > st.bbox_north || pos.lon < st.bbox_west || pos.lon > st.bbox_east) {
+            return false;
+          }
+        }
+      }
+
       return true;
     });
 
@@ -134,7 +165,7 @@ export default function DisasterMap({ onEventSelect }) {
       marker.addTo(map);
       markersRef.current[event.id] = marker;
     });
-  }, [events, filters, setSelectedEvent, onEventSelect]);
+  }, [events, filters, mapReady, setSelectedEvent, onEventSelect]);
 
   // ── Render user location marker ───────────────────
   useEffect(() => {
@@ -157,7 +188,7 @@ export default function DisasterMap({ onEventSelect }) {
           iconAnchor: [12, 12],
         });
         userMarkerRef.current = L.marker([userLocation.lat, userLocation.lon], { icon, zIndexOffset: 1000 }).addTo(map);
-        userMarkerRef.current.bindPopup('<div style="font-family:Inter;font-weight:600;font-size:12px;">📍 You are here</div>');
+        userMarkerRef.current.bindPopup('<div style="font-family:Inter;font-weight:600;font-size:12px;display:flex;align-items:center;gap:4px;"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg> You are here</div>');
       } else {
         userMarkerRef.current.setLatLng([userLocation.lat, userLocation.lon]);
       }
@@ -203,9 +234,9 @@ export default function DisasterMap({ onEventSelect }) {
         style={{ height: '100%', width: '100%' }}
         aria-label="Disaster event map"
       />
-      {/* 🇮🇳 India state boundaries */}
+      {/* India state boundaries */}
       {mapReady && <IndiaMapLayer map={mapInstance.current} />}
-      {/* 🏔️ BIS Seismic zone overlay */}
+      {/* BIS Seismic zone overlay */}
       {mapReady && <SeismicZoneLayer map={mapInstance.current} visible={filters.showSeismicZones !== false} />}
     </div>
   );

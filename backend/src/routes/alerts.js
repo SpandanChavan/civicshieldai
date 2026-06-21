@@ -1,13 +1,9 @@
 const express = require('express');
-const { createClient } = require('@supabase/supabase-js');
 const { z } = require('zod');
 const { routeAlert } = require('../services/notificationRouter');
 const { logAudit } = require('../utils/auditLogger');
+const { getAdminDb: getDb } = require('../lib/db');
 const router = express.Router();
-
-function getDb() {
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-}
 
 // ── Zod schema for alert creation ────────────────────
 const AlertSchema = z.object({
@@ -35,6 +31,9 @@ router.get('/', async (req, res) => {
       .range(Number(offset), Number(offset) + Number(limit) - 1);
 
     if (status) query = query.eq('status', status);
+    if (req.userRole === 'coordinator' && req.userStateId) {
+      query = query.eq('state_id', req.userStateId);
+    }
 
     const { data, error } = await query;
     if (error) throw error;
@@ -63,20 +62,26 @@ router.get('/:id', async (req, res) => {
 // ── POST /api/alerts/subscribe ────────────────────────
 router.post('/subscribe', async (req, res) => {
   const subscription = req.body;
-  if (!subscription || !subscription.endpoint) {
-    return res.status(400).json({ error: 'Invalid subscription object' });
+  // B5 FIX: validate the full PushSubscription shape from the browser
+  if (!subscription || !subscription.endpoint || !subscription.keys?.p256dh || !subscription.keys?.auth) {
+    return res.status(400).json({
+      error: 'Invalid subscription object. Expected { endpoint, keys: { p256dh, auth } }'
+    });
   }
 
   try {
     const db = getDb();
-    // Upsert subscription using endpoint as the unique key
+    // B5 FIX: map subscription.keys.p256dh / .auth to the correct columns
     const { error } = await db
       .from('push_subscriptions')
       .upsert({
-        endpoint: subscription.endpoint,
-        keys: subscription.keys,
+        endpoint:    subscription.endpoint,
+        p256dh:      subscription.keys.p256dh,
+        auth:        subscription.keys.auth,
+        user_id:     req.userId || null,
+        device_info: subscription.device_info || null,
       }, { onConflict: 'endpoint' });
-      
+
     if (error) throw error;
     res.status(201).json({ success: true });
   } catch (e) {
@@ -92,6 +97,12 @@ router.post('/', async (req, res) => {
     return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
   }
 
+  if (req.userRole === 'coordinator' && req.userStateId) {
+    req.body.state_id = req.userStateId;
+  } else if (req.userRole !== 'admin') {
+    return res.status(403).json({ error: 'State assignment required to create alerts' });
+  }
+
   const { recipients, ...alertData } = parsed.data;
   const db = getDb();
 
@@ -99,7 +110,7 @@ router.post('/', async (req, res) => {
     // Create alert as 'draft'
     const { data: alert, error } = await db
       .from('alerts')
-      .insert({ ...alertData, status: 'draft' })
+      .insert({ ...alertData, status: 'draft', state_id: req.body.state_id })
       .select()
       .single();
     if (error) throw error;
@@ -142,11 +153,19 @@ router.post('/', async (req, res) => {
   }
 });
 
-// ── DELETE /api/alerts/:id ────────────────────────────
+// ── DELETE /api/alerts/:id ────────────────────────
 router.delete('/:id', async (req, res) => {
+  // B8 FIX: require authentication + admin/coordinator role
+  if (!req.userId) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  if (req.userRole !== 'admin' && req.userRole !== 'coordinator') {
+    return res.status(403).json({ error: 'Forbidden: Coordinators and admins only' });
+  }
   try {
     const { error } = await getDb().from('alerts').delete().eq('id', req.params.id);
     if (error) throw error;
+    logAudit('ALERT_DELETED', req.userId, req.params.id, {});
     res.json({ message: 'Alert deleted' });
   } catch (e) {
     res.status(500).json({ error: e.message });

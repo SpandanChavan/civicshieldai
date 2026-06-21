@@ -70,7 +70,7 @@ const translations = {
     'sidebar.loading':      'Loading events...',
 
     // Monsoon
-    'monsoon.active':   '🌧️ Monsoon Season',
+    'monsoon.active':   'Monsoon Season',
     'monsoon.watch':    'Monsoon Watch',
     'monsoon.onset':    'Monsoon Onset',
     'monsoon.normal':   'Normal',
@@ -139,7 +139,7 @@ const translations = {
     'sidebar.loading':      'लोड हो रहा है...',
 
     // Monsoon
-    'monsoon.active':   '🌧️ मानसून सीजन',
+    'monsoon.active':   'मानसून सीजन',
     'monsoon.watch':    'मानसून निगरानी',
     'monsoon.onset':    'मानसून आगमन',
     'monsoon.normal':   'सामान्य',

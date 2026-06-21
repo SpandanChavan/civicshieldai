@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import useAppStore from '@/store/useAppStore';
+import { Search, MapPin, Mail, X, Loader2 } from 'lucide-react';
 
 /**
  * PinSearch — India PIN code / district / city search bar.
@@ -31,10 +32,11 @@ export default function PinSearch() {
           const data = await res.json();
           if (data?.[0]?.Status === 'Success') {
             const offices = data[0].PostOffice || [];
-            setResults(offices.slice(0, 5).map((o) => ({
+              setResults(offices.slice(0, 5).map((o) => ({
               label: `${o.Name}, ${o.District}, ${o.State}`,
               district: o.District,
               state: o.State,
+              pincode: val.trim(),
               lat: null,
               lon: null,
               type: 'pincode',
@@ -49,15 +51,38 @@ export default function PinSearch() {
             c.district?.toLowerCase().startsWith(val.toLowerCase()) ||
             c.state.toLowerCase().includes(val.toLowerCase())
           ).slice(0, 6);
-          setResults(matched.map((c) => ({
-            label: `${c.name}, ${c.state}`,
-            district: c.district || c.name,
-            state: c.state,
-            lat: c.lat,
-            lon: c.lon,
-            type: 'city',
-          })));
-          if (!matched.length) setError('No results found');
+          if (matched.length > 0) {
+            setResults(matched.map((c) => ({
+              label: `${c.name}, ${c.state}`,
+              district: c.district || c.name,
+              state: c.state,
+              lat: c.lat,
+              lon: c.lon,
+              type: 'city',
+            })));
+          } else {
+            // ── Fallback to live OSM Nominatim search ────────
+            const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(val.trim())}&countrycodes=in&format=json&addressdetails=1&limit=5`);
+            const data = await res.json();
+            
+            if (data && data.length > 0) {
+              setResults(data.map((d) => {
+                const city = d.address?.city || d.address?.town || d.address?.county || d.name;
+                const state = d.address?.state || '';
+                return {
+                  label: `${city}${state ? `, ${state}` : ''}`,
+                  district: d.address?.state_district || city,
+                  state: state,
+                  lat: parseFloat(d.lat),
+                  lon: parseFloat(d.lon),
+                  boundingbox: d.boundingbox,
+                  type: 'city',
+                };
+              }));
+            } else {
+              setError('No results found');
+            }
+          }
         }
       } catch (e) {
         setError('Search failed — check connection');
@@ -67,7 +92,7 @@ export default function PinSearch() {
     }, 400);
   }
 
-  function selectResult(result) {
+  async function selectResult(result) {
     setQuery(result.label);
     setResults([]);
     setError('');
@@ -75,19 +100,54 @@ export default function PinSearch() {
     const map = window.__civicshieldMap;
     if (!map) return;
 
-    if (result.lat && result.lon) {
-      map.flyTo([result.lat, result.lon], 9, { duration: 1.2 });
-    } else if (result.state) {
-      // Try to fly to state capital
-      const capital = STATE_CAPITALS[result.state];
-      if (capital) map.flyTo(capital, 8, { duration: 1.2 });
-    }
-
-    // Set district/state filter
+    // Set district/state filter for the sidebar immediately
     setFilter('stateFilter', result.state);
     window.dispatchEvent(new CustomEvent('india:stateclick', {
       detail: { stateName: result.state }
     }));
+
+    if (result.boundingbox) {
+      const bounds = [
+        [parseFloat(result.boundingbox[0]), parseFloat(result.boundingbox[2])],
+        [parseFloat(result.boundingbox[1]), parseFloat(result.boundingbox[3])]
+      ];
+      map.fitBounds(bounds, { padding: [40, 40], animate: true, duration: 1.2 });
+      return;
+    } else if (result.lat && result.lon) {
+      map.flyTo([result.lat, result.lon], 9, { duration: 1.2 });
+      return;
+    }
+
+    // Geocode the PIN code or district on the fly using free Nominatim API
+    try {
+      const queryStr = result.type === 'pincode' 
+        ? `postalcode=${result.pincode}&countrycodes=in` 
+        : `q=${encodeURIComponent(result.district + ', ' + result.state)}&countrycodes=in`;
+        
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?${queryStr}&format=json&limit=1`);
+      const data = await res.json();
+      
+      if (data && data.length > 0) {
+        const { lat, lon, boundingbox } = data[0];
+        if (boundingbox) {
+          // [south, north, west, east] — Leaflet fitBounds expects [[south, west], [north, east]]
+          const bounds = [
+            [parseFloat(boundingbox[0]), parseFloat(boundingbox[2])],
+            [parseFloat(boundingbox[1]), parseFloat(boundingbox[3])]
+          ];
+          map.fitBounds(bounds, { padding: [40, 40], animate: true, duration: 1.2 });
+        } else {
+          map.flyTo([parseFloat(lat), parseFloat(lon)], 12, { duration: 1.2 });
+        }
+        return;
+      }
+    } catch (e) {
+      console.warn("[Geocoding] Nominatim lookup failed:", e);
+    }
+
+    // Fallback to state capital if geocoding fails or returns no results
+    const capital = STATE_CAPITALS[result.state];
+    if (capital) map.flyTo(capital, 8, { duration: 1.2 });
   }
 
   function clearSearch() {
@@ -98,46 +158,63 @@ export default function PinSearch() {
   }
 
   return (
-    <div className="relative" style={{ minWidth: 220 }}>
-      {/* Input */}
-      <div className="glass rounded-xl flex items-center gap-2 px-3 py-2">
-        <span style={{ fontSize: 14 }}>🔍</span>
+    <div className="relative font-sans" style={{ minWidth: 220 }}>
+      {/* Input Box */}
+      <div className="relative">
+        <Search size={16} className="absolute left-3 top-2.5 text-slate-400" />
         <input
           id="india-pin-search"
           type="text"
           value={query}
           onChange={(e) => handleSearch(e.target.value)}
           placeholder="Search city, district or PIN..."
-          className="bg-transparent text-sm text-slate-200 placeholder-slate-500 outline-none flex-1"
-          style={{ minWidth: 0 }}
+          className="input glass !pl-9 !pr-8"
           autoComplete="off"
         />
-        {query && (
-          <button
-            onClick={clearSearch}
-            className="text-slate-500 hover:text-slate-300 text-xs"
-            title="Clear"
-          >✕</button>
-        )}
-        {loading && (
-          <span className="text-slate-500 text-xs animate-pulse">...</span>
-        )}
+        
+        {loading ? (
+          <div className="absolute right-3 top-2.5">
+            <Loader2 size={16} className="text-brand-500 animate-spin" />
+          </div>
+        ) : query ? (
+          <button 
+            onClick={clearSearch} 
+            className="absolute right-2 top-2 p-1 hover:bg-white/10 rounded-lg transition-colors"
+          >
+            <X size={14} className="text-slate-400 hover:text-white" />
+          </button>
+        ) : null}
       </div>
 
       {/* Dropdown */}
       {(results.length > 0 || error) && (
-        <div className="absolute top-full left-0 right-0 mt-1 glass rounded-xl overflow-hidden z-[2000] shadow-lg">
+        <div className="absolute top-[calc(100%+8px)] left-0 right-0 glass rounded-xl overflow-hidden shadow-2xl z-[2000] animate-in fade-in slide-in-from-top-2">
           {error && (
-            <div className="px-3 py-2 text-xs text-slate-400 italic">{error}</div>
+            <div className="p-3 text-xs text-slate-400 italic text-center">
+              {error}
+            </div>
           )}
           {results.map((r, i) => (
             <button
               key={i}
               onClick={() => selectResult(r)}
-              className="w-full text-left px-3 py-2 text-xs text-slate-300 hover:bg-white/10 transition-colors border-b border-white/5 last:border-0 flex items-center gap-2"
+              className={`w-full text-left p-3 flex items-center gap-3 transition-colors hover:bg-white/10 ${
+                i !== results.length - 1 ? 'border-b border-white/5' : ''
+              }`}
             >
-              <span>{r.type === 'pincode' ? '📮' : '📍'}</span>
-              <span>{r.label}</span>
+              <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
+                r.type === 'pincode' ? 'bg-blue-500/10 text-blue-400' : 'bg-emerald-500/10 text-emerald-400'
+              }`}>
+                {r.type === 'pincode' ? <Mail size={12} /> : <MapPin size={12} />}
+              </div>
+              <div className="flex flex-col gap-0.5 min-w-0">
+                <span className="text-sm font-semibold text-slate-200 leading-tight truncate">
+                  {r.label.split(',')[0]}
+                </span>
+                <span className="text-xs font-medium text-slate-500 leading-tight truncate">
+                  {r.label.substring(r.label.indexOf(',') + 1).trim()}
+                </span>
+              </div>
             </button>
           ))}
         </div>

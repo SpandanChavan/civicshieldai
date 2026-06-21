@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { supabase } from './supabaseClient';
 
 const envBackendUrl = import.meta.env.VITE_BACKEND_URL;
 const envMlUrl = import.meta.env.VITE_ML_SERVICE_URL;
@@ -11,6 +12,15 @@ export const backendApi = axios.create({
   baseURL: `${BACKEND_URL}/api`,
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
+});
+
+// ── Auto-attach Supabase JWT so stateScope middleware can resolve coordinator's state ──
+backendApi.interceptors.request.use(async (config) => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.access_token) {
+    config.headers.Authorization = `Bearer ${session.access_token}`;
+  }
+  return config;
 });
 
 // ── ML Service Client ─────────────────────────────────

@@ -1,6 +1,9 @@
 /**
  * Geospatial helper utilities for CivicShield AI.
  */
+import { createElement } from 'react';
+import { renderToString } from 'react-dom/server';
+import { Activity, Flame, Waves, Wind, Mountain, Sun, ThermometerSun, Snowflake, Globe2, AlertTriangle } from 'lucide-react';
 
 /**
  * Calculate Haversine distance between two points in km.
@@ -97,9 +100,9 @@ export function getEventLatLon(event) {
 export function severityColor(severity) {
   const map = {
     Critical: '#ef4444',
-    High:     '#f59e0b',
-    Medium:   '#3b82f6',
-    Low:      '#10b981',
+    High: '#f59e0b',
+    Medium: '#3b82f6',
+    Low: '#10b981',
   };
   return map[severity] || '#6b7280';
 }
@@ -108,38 +111,52 @@ export function severityColor(severity) {
  * Get Leaflet DivIcon HTML for a disaster event marker.
  */
 export function eventMarkerIcon(event) {
-  const typeEmoji = {
-    Earthquake:     '🔴',
-    Wildfire:       '🔥',
-    Flood:          '🌊',
-    Cyclone:        '🌀',
-    Tsunami:        '🌊',
-    Volcano:        '🌋',
-    Landslide:      '⛰️',
-    Drought:        '🏜️',
-    Heatwave:       '🌡️',
-    'Heat Wave':    '🌡️',
-    'Cold Wave':    '❄️',
-    'Natural Event':'🌐',
-    default:        '⚠️',
-  };
-  const emoji = typeEmoji[event.event_type] || typeEmoji.default;
   const color = severityColor(event.severity);
+  const typeIcon = {
+    Earthquake:     Activity,
+    Wildfire:       Flame,
+    Flood:          Waves,
+    Cyclone:        Wind,
+    Tsunami:        Waves,
+    Volcano:        Mountain,
+    Landslide:      Mountain,
+    Drought:        Sun,
+    Heatwave:       ThermometerSun,
+    'Heat Wave':    ThermometerSun,
+    'Cold Wave':    Snowflake,
+    'Natural Event':Globe2,
+    default:        AlertTriangle,
+  };
+  
+  const IconComponent = typeIcon[event.event_type] || typeIcon.default;
+  const iconHtml = renderToString(createElement(IconComponent, { size: 16, color: color, strokeWidth: 2.5 }));
+
+  const criticalBadge = event.severity === 'Critical' 
+    ? `<div style="position:absolute;top:-2px;right:-2px;width:10px;height:10px;background:#ef4444;border-radius:50%;box-shadow:0 0 8px #ef4444, 0 0 0 2px #0f172a;"></div>` 
+    : '';
 
   return {
-    html: `<div style="
-      background:${color}22;
-      border:2px solid ${color};
-      border-radius:50%;
-      width:32px;height:32px;
-      display:flex;align-items:center;justify-content:center;
-      font-size:14px;cursor:pointer;
-      box-shadow:0 0 12px ${color}55;
-    ">${emoji}</div>`,
+    html: `
+      <div style="
+        position: relative;
+        width: 32px;
+        height: 32px;
+        background: #0f172a;
+        border: 2px solid ${color};
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.5), 0 0 10px ${color}40;
+      ">
+        ${iconHtml}
+        ${criticalBadge}
+      </div>
+    `,
     className: '',
     iconSize: [32, 32],
     iconAnchor: [16, 16],
-    popupAnchor: [0, -20],
+    popupAnchor: [0, -16],
   };
 }
 

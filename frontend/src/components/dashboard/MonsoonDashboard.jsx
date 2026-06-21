@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import useAppStore from '@/store/useAppStore';
 import { useTranslation } from '@/utils/i18n';
+import { Sun, CloudRain, Waves, CalendarDays } from 'lucide-react';
 
 // Monsoon active: June 1 – September 30
 function isMonsoonSeason() {
@@ -60,7 +61,7 @@ export default function MonsoonDashboard() {
     return (
       <div className="glass-card">
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-xl">☀️</span>
+          <Sun className="text-amber-400" size={24} />
           <div>
             <p className="text-sm font-bold text-white">{t('monsoon.watch')}</p>
             <p className="text-xs text-slate-400">Next monsoon in <strong className="text-brand-400">{daysUntil} days</strong></p>
@@ -84,7 +85,7 @@ export default function MonsoonDashboard() {
       <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">🌧️</span>
+            <CloudRain className="text-blue-400" size={24} />
             <div>
               <p className="text-sm font-bold text-blue-300">{t('monsoon.active')}</p>
               <p className="text-xs text-slate-400">Jun 1 – Sep 30 · IMD Monitoring Active</p>
@@ -113,8 +114,8 @@ export default function MonsoonDashboard() {
 
       {/* ── River Basin Flood Risk ── */}
       <div>
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-          🌊 River Basin Risk
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <Waves size={14} className="text-blue-400" /> River Basin Risk
         </p>
         <div className="space-y-1.5">
           {RIVER_BASINS.map((basin) => {
@@ -140,8 +141,8 @@ export default function MonsoonDashboard() {
 
       {/* ── Monsoon Onset Dates ── */}
       <div>
-        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-          📅 {t('monsoon.onset')} (Normal Dates)
+        <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <CalendarDays size={14} className="text-indigo-400" /> {t('monsoon.onset')} (Normal Dates)
         </p>
         <div className="grid grid-cols-2 gap-1.5">
           {ONSET_DATES.map((o) => (

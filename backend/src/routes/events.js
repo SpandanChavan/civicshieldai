@@ -57,6 +57,9 @@ router.get('/', cacheMiddleware(30), async (req, res) => {
       const queries = EVENT_TYPES.map((et) => {
         let q = db.from('events').select('*').eq('event_type', et);
         if (active !== 'all') q = q.eq('is_active', active === 'true');
+        if (req.userRole === 'coordinator' && req.userStateId) {
+          q = q.eq('state_id', req.userStateId);
+        }
         return q.order('detected_at', { ascending: false }).limit(PER_TYPE);
       });
 
@@ -76,6 +79,9 @@ router.get('/', cacheMiddleware(30), async (req, res) => {
     if (active !== 'all') query = query.eq('is_active', active === 'true');
     if (type) query = query.eq('event_type', type);
     if (severity) query = query.eq('severity', severity);
+    if (req.userRole === 'coordinator' && req.userStateId) {
+      query = query.eq('state_id', req.userStateId);
+    }
 
     const { data, error } = await query;
     if (error) throw error;
@@ -93,10 +99,11 @@ router.get('/', cacheMiddleware(30), async (req, res) => {
 router.get('/stats/summary', cacheMiddleware(60), async (req, res) => {
   try {
     const db = getDb();
-    const { data, error } = await db
-      .from('events')
-      .select('event_type, severity')
-      .eq('is_active', true);
+    let query = db.from('events').select('event_type, severity').eq('is_active', true);
+    if (req.userRole === 'coordinator' && req.userStateId) {
+      query = query.eq('state_id', req.userStateId);
+    }
+    const { data, error } = await query;
     if (error) throw error;
 
     const summary = data.reduce((acc, e) => {

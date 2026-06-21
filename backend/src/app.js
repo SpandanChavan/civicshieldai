@@ -16,6 +16,8 @@ if (process.env.SENTRY_DSN) {
     profilesSampleRate: 1.0,
   });
 }
+const statesRoutes = require('./routes/states');
+const adminRoutes = require('./routes/admin');
 const cors = require('cors');
 const helmet = require('helmet');
 const { createServer } = require('http');
@@ -24,22 +26,35 @@ const rateLimit = require('express-rate-limit');
 const { startCronJobs } = require('./cron/apiPollers');
 const requestLogger = require('./middleware/requestLogger');
 const errorHandler  = require('./middleware/errorHandler');
+const stateScope    = require('./middleware/stateScope');
+
+// M3 FIX: restrict CORS to an explicit allow-list from env
+// In dev, defaults to both common Vite and CRA ports.
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:5173')
+  .split(',').map(o => o.trim()).filter(Boolean);
+
+function corsOriginCheck(origin, callback) {
+  // Allow requests with no origin (server-to-server, curl, mobile apps)
+  if (!origin) return callback(null, true);
+  if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+  callback(new Error(`CORS: Origin '${origin}' is not in the allow-list`));
+}
 
 const app = express();
 const httpServer = createServer(app);
 
 const io = new Server(httpServer, {
   cors: {
-    origin: function(origin, callback) { callback(null, true); },
+    origin: corsOriginCheck,
     methods: ['GET', 'POST'],
     credentials: true,
   },
 });
 
-// ── Security Middleware ──────────────────────────────
+// ── Security Middleware ───────────────────────────
 app.use(helmet());
 app.use(cors({
-  origin: function(origin, callback) { callback(null, true); },
+  origin: corsOriginCheck,
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -55,15 +70,20 @@ app.use(rateLimit({
   message: { error: 'Too many requests, please try again later.' },
 }));
 
+// Apply state scope resolving for coordinators globally across API
+app.use('/api', stateScope);
+
 // ── Routes ───────────────────────────────────────────
 app.use('/api/events',    require('./routes/events'));
 app.use('/api/alerts',    require('./routes/alerts'));
 app.use('/api/resources', require('./routes/resources'));
 app.use('/api/incidents', require('./routes/incidents'));
 app.use('/api/predictions', require('./routes/predictions'));
+app.use('/api/states', statesRoutes);
+app.use('/api/admin', adminRoutes);
 
-// ── Health Check ─────────────────────────────────────
-const { createClient } = require('@supabase/supabase-js');
+// ── Health Check ─────────────────────────────
+const { getAdminDb } = require('./lib/db'); // m5: singleton
 const axios = require('axios');
 
 app.get('/health', async (_req, res) => {
@@ -71,8 +91,7 @@ app.get('/health', async (_req, res) => {
   let mlStatus = 'offline';
 
   try {
-    const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-    const { error } = await db.from('events').select('id').limit(1);
+    const { error } = await getAdminDb().from('events').select('id').limit(1);
     if (!error) dbStatus = 'connected';
   } catch (e) {}
 
@@ -87,6 +106,7 @@ app.get('/health', async (_req, res) => {
     status: 'ok',
     database: dbStatus,
     ml_service: mlStatus,
+    allowed_origins: ALLOWED_ORIGINS,
   });
 });
 
@@ -100,13 +120,57 @@ if (process.env.SENTRY_DSN) {
 }
 app.use(errorHandler);
 
-// ── Socket.io ────────────────────────────────────────
+// ── Socket.io ────────────────────────────────
+// N1 FIX: Secure io.use() middleware verifies JWT before allowing connections
+io.use(async (socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (!token) return next(); // join as anonymous
+
+  try {
+    const { getAnonDb, getAdminDb } = require('./lib/db');
+    // Verify token using anon client
+    const { data: { user }, error: authError } = await getAnonDb().auth.getUser(token);
+    if (authError || !user) {
+      return next(new Error('Authentication failed'));
+    }
+    socket.userId = user.id;
+
+    // Look up profile state and role
+    const { data: profile } = await getAdminDb()
+      .from('user_profiles')
+      .select('state_id, role')
+      .eq('id', user.id)
+      .single();
+
+    if (profile) {
+      socket.userRole = profile.role || 'citizen';
+      socket.userStateId = profile.state_id;
+    }
+  } catch (err) {
+    console.error('[Socket] Auth error:', err.message);
+  }
+  next();
+});
+
+// Broadcasts in apiPollers use io.to('room') instead of io.emit.
 io.on('connection', (socket) => {
   console.log(`[Socket] Client connected: ${socket.id}`);
+
+  // Server sets these values based on the secure io.use() middleware
+  const role    = socket.userRole;
+  const stateId = socket.userStateId;
+
+  socket.join('public');                          // all clients
+  if (role)    socket.join(`role:${role}`);       // e.g. role:coordinator
+  if (stateId) socket.join(`state:${stateId}`);   // e.g. state:<uuid>
+
   socket.on('disconnect', () => {
     console.log(`[Socket] Client disconnected: ${socket.id}`);
   });
 });
+
+// Expose io so apiPollers can emit to scoped rooms
+app.set('io', io);
 
 // ── Start server ─────────────────────────────────────
 const PORT = process.env.PORT || 4000;

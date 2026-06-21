@@ -1,24 +1,27 @@
 import { timeAgo } from '@/utils/formatDate';
+import { Activity, Flame, Waves, Wind, Mountain, AlertTriangle } from 'lucide-react';
 
-const SEVERITY_ICONS = {
-  Critical: '🔴',
-  High:     '🟠',
-  Medium:   '🟡',
-  Low:      '🟢',
+const SEVERITY_COLORS = {
+  Critical: 'bg-red-500',
+  High:     'bg-orange-500',
+  Medium:   'bg-amber-400',
+  Low:      'bg-emerald-400',
 };
 
 const TYPE_ICONS = {
-  Earthquake: '🔴',
-  Wildfire:   '🔥',
-  Flood:      '🌊',
-  Cyclone:    '🌀',
-  Tsunami:    '🌊',
-  Volcano:    '🌋',
+  Earthquake: Activity,
+  Wildfire:   Flame,
+  Flood:      Waves,
+  Cyclone:    Wind,
+  Tsunami:    Waves,
+  Volcano:    Mountain,
+  Landslide:  Mountain,
+  default:    AlertTriangle,
 };
 
 export default function AlertCard({ event, onClick }) {
-  const icon = TYPE_ICONS[event.event_type] || '⚠️';
-  const sevIcon = SEVERITY_ICONS[event.severity] || '⚪';
+  const IconComponent = TYPE_ICONS[event.event_type] || TYPE_ICONS.default;
+  const sevColor = SEVERITY_COLORS[event.severity] || 'bg-slate-400';
   const severityClass = `severity-${event.severity?.toLowerCase()}`;
 
   return (
@@ -36,10 +39,15 @@ export default function AlertCard({ event, onClick }) {
       aria-label={`${event.event_type} event: ${event.title}`}
     >
       <div className="flex items-start gap-3">
-        <span className="text-2xl flex-shrink-0 mt-0.5" aria-hidden="true">{icon}</span>
+        <div className="mt-1 flex-shrink-0 text-slate-300 bg-white/5 border border-white/10 p-2 rounded-xl">
+          <IconComponent size={20} />
+        </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
-            <span className={severityClass}>{sevIcon} {event.severity}</span>
+            <span className={`flex items-center gap-1.5 ${severityClass}`}>
+              <span className={`w-2.5 h-2.5 rounded-full ${sevColor} shadow-[0_0_6px_currentColor]`} />
+              {event.severity}
+            </span>
             <span className="text-xs text-slate-500">{event.event_type}</span>
           </div>
           <h3 className="text-sm font-semibold text-white leading-snug line-clamp-2">

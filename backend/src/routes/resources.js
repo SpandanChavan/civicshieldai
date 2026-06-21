@@ -26,6 +26,9 @@ router.get('/', async (req, res) => {
     let query = getDb().from('resources').select('*').limit(Number(limit));
     if (type) query = query.eq('type', type);
     if (status) query = query.eq('status', status);
+    if (req.userRole === 'coordinator' && req.userStateId) {
+      query = query.eq('state_id', req.userStateId);
+    }
     const { data, error } = await query;
     if (error) throw error;
     res.json({ data });
@@ -40,12 +43,19 @@ router.post('/', async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
   }
+  if (req.userRole === 'coordinator' && req.userStateId) {
+    req.body.state_id = req.userStateId;
+  } else if (req.userRole !== 'admin') {
+    return res.status(403).json({ error: 'State assignment required to manage resources' });
+  }
+
   const { location, ...rest } = parsed.data;
   try {
     const { data, error } = await getDb()
       .from('resources')
       .insert({
         ...rest,
+        state_id: req.body.state_id,
         ...(location && {
           location: `SRID=4326;POINT(${location.lon} ${location.lat})`,
         }),

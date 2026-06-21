@@ -65,6 +65,10 @@ const useAppStore = create((set, get) => ({
   // ── UI State ────────────────────────────────────────
   sidebarOpen: true,
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
+  portalLeftOpen: true,
+  setPortalLeftOpen: (open) => set({ portalLeftOpen: open }),
+  portalRightOpen: true,
+  setPortalRightOpen: (open) => set({ portalRightOpen: open }),
   activePanel: 'events',  // 'events' | 'alerts' | 'resources' | 'incidents'
   setActivePanel: (panel) => set({ activePanel: panel }),
   language: 'en',         // 🌐 'en' | 'hi'

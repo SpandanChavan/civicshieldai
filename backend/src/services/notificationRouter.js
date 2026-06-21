@@ -3,10 +3,10 @@ const { Telegraf } = require('telegraf');
 const axios = require('../utils/axiosClient');
 const twilio = require('twilio');
 const webpush = require('web-push');
-const { createClient } = require('@supabase/supabase-js');
+const { getAdminDb } = require('../lib/db');
 
 // Initialize clients lazily (only when keys are present)
-let resend, telegram, twilioClient, supabase;
+let resend, telegram, twilioClient;
 
 function getResend() {
   if (!resend && process.env.RESEND_API_KEY) {
@@ -27,13 +27,6 @@ function getTwilio() {
     twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
   }
   return twilioClient;
-}
-
-function getSupabase() {
-  if (!supabase && process.env.SUPABASE_URL) {
-    supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-  }
-  return supabase;
 }
 
 function initWebPush() {
@@ -109,21 +102,21 @@ async function sendWhatsApp(to, message) {
   }
 }
 
-// ── SMS via Twilio ───────────────────────────────────
+// ── SMS via Twilio ─────────────────────────────
 async function sendSMS(to, message) {
   const client = getTwilio();
   if (!client) {
     console.warn('[Notifications] TWILIO credentials not set — skipping SMS');
     return { skipped: true };
   }
+  // m2 FIX: use dedicated SMS number only; never fall back to WhatsApp sandbox
+  const from = process.env.TWILIO_SMS_NUMBER;
+  if (!from) {
+    console.warn('[Notifications] TWILIO_SMS_NUMBER not set — skipping SMS');
+    return { skipped: true, reason: 'TWILIO_SMS_NUMBER not configured' };
+  }
   try {
-    // Assuming the Twilio WhatsApp number or another number is used for SMS
-    const from = process.env.TWILIO_SMS_NUMBER || process.env.TWILIO_WHATSAPP_NUMBER || '+14155238886'; 
-    const result = await client.messages.create({
-      body: message,
-      from,
-      to
-    });
+    const result = await client.messages.create({ body: message, from, to });
     return result;
   } catch (e) {
     console.error('[Notifications] SMS send failed:', e.message);
@@ -131,15 +124,14 @@ async function sendSMS(to, message) {
   }
 }
 
-// ── Web Push ──────────────────────────────────────────
+// ── Web Push ───────────────────────────────────
 async function sendWebPush(title, body, severity) {
   if (!initWebPush()) {
     console.warn('[Notifications] VAPID keys not set — skipping Web Push');
     return { skipped: true };
   }
-  
-  const db = getSupabase();
-  if (!db) return { skipped: true, error: 'No DB' };
+
+  const db = getAdminDb();
 
   try {
     const { data: subs, error } = await db.from('push_subscriptions').select('*');
@@ -148,9 +140,15 @@ async function sendWebPush(title, body, severity) {
 
     const payload = JSON.stringify({ title, body, severity });
     const results = await Promise.allSettled(
-      subs.map((sub) => webpush.sendNotification(sub, payload))
+      subs.map((sub) =>
+        // B5 FIX: reshape flat DB row into the PushSubscription object web-push expects
+        webpush.sendNotification(
+          { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+          payload
+        )
+      )
     );
-    
+
     return { successCount: results.filter(r => r.status === 'fulfilled').length, total: subs.length };
   } catch (e) {
     console.error('[Notifications] Web Push failed:', e.message);
@@ -158,9 +156,14 @@ async function sendWebPush(title, body, severity) {
   }
 }
 
-// ── LibreTranslate ────────────────────────────────────
+// ── LibreTranslate ───────────────────────────────
 async function translateText(text, targetLang, sourceLang = 'en') {
-  const baseUrl = process.env.LIBRETRANSLATE_URL || 'http://localhost:5000';
+  // m3 FIX: do not attempt translation if LIBRETRANSLATE_URL is not explicitly set;
+  // avoids a guaranteed network failure to localhost:5000 in production.
+  const baseUrl = process.env.LIBRETRANSLATE_URL;
+  if (!baseUrl) {
+    return text; // degrade gracefully — return original text
+  }
   try {
     const { data } = await axios.post(`${baseUrl}/translate`, {
       q: text,

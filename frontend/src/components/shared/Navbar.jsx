@@ -1,149 +1,246 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import useAppStore from '@/store/useAppStore';
 import { LANGUAGES, useTranslation } from '@/utils/i18n';
 import { useAuth } from '@/hooks/useAuth';
+import { Shield, Globe2, RefreshCw, LogOut, ChevronDown, SlidersHorizontal, AlertTriangle } from 'lucide-react';
 
-const ROLE_COLORS = {
-  coordinator: 'bg-brand-600/30 text-brand-300 border-brand-500/30',
-  responder:   'bg-amber-500/20 text-amber-300 border-amber-500/30',
-  citizen:     'bg-slate-700/50 text-slate-300 border-slate-600/30',
+const ROLE_NAV = {
+  guest:       [],
+  citizen:     [{ to: '/citizen',   label: 'My Portal',     icon: Globe2 }],
+  coordinator: [{ to: '/dashboard', label: 'Dashboard',     icon: Globe2 }],
+  admin:       [{ to: '/admin',     label: 'Admin Panel',   icon: Globe2 }],
+};
+
+const ROLE_CONFIG = {
+  coordinator: { color: '#8b5cf6', bg: 'rgba(139,92,246,0.15)', border: 'rgba(139,92,246,0.3)', label: 'Coordinator' },
+  citizen:     { color: '#00A693', bg: 'rgba(0,166,147,0.15)',  border: 'rgba(0,166,147,0.3)',  label: 'Citizen'      },
+  admin:       { color: '#ef4444', bg: 'rgba(239,68,68,0.15)',  border: 'rgba(239,68,68,0.3)',  label: 'Admin'        },
+  guest:       { color: '#64748b', bg: 'rgba(100,116,139,0.1)', border: 'rgba(100,116,139,0.2)',label: 'Guest'        },
 };
 
 export default function Navbar() {
   const isConnected = useAppStore((s) => s.isConnected);
   const lastUpdate  = useAppStore((s) => s.lastUpdate);
   const eventStats  = useAppStore((s) => s.eventStats);
+  const events      = useAppStore((s) => s.events);
   const language    = useAppStore((s) => s.language);
   const setLanguage = useAppStore((s) => s.setLanguage);
+  
+  const portalRightOpen = useAppStore((s) => s.portalRightOpen);
+  const setPortalRightOpen = useAppStore((s) => s.setPortalRightOpen);
+
   const { t }       = useTranslation();
-  const { user, role, signOut } = useAuth();
+  const { user, role, profile, signOut } = useAuth();
   const navigate    = useNavigate();
+  const location    = useLocation();
 
+  const isPortal = location.pathname === '/portal';
   const criticalCount = eventStats.bySeverity?.Critical || 0;
+  const activeCount   = events.filter(e => e.is_active).length;
+  const effectiveRole = !user ? 'guest' : (role || 'citizen');
+  const navLinks = ROLE_NAV[effectiveRole] || [];
+  const roleConf = ROLE_CONFIG[effectiveRole] || ROLE_CONFIG.guest;
 
-  const navLinkClass = ({ isActive }) =>
-    `px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-      isActive
-        ? 'bg-brand-600/30 text-brand-300 border border-brand-500/30'
-        : 'text-slate-400 hover:text-white hover:bg-white/5'
-    }`;
+  let roleBadgeLabel = roleConf.label;
+  if (role === 'coordinator' && profile?.states) {
+    roleBadgeLabel = `${profile.states.name}`;
+  }
 
   const handleSignOut = async () => {
     await signOut();
-    navigate('/portal');
+    navigate('/landing');
   };
 
-  return (
-    <header className="glass border-b border-white/5 sticky top-0 z-50">
-      <div className="max-w-screen-2xl mx-auto flex items-center justify-between h-14 px-4">
+  const navLinkStyle = (isActive) => ({
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '6px 14px',
+    borderRadius: 8,
+    fontSize: 13,
+    fontWeight: 600,
+    color: isActive ? 'white' : '#94a3b8',
+    background: isActive ? 'rgba(0,166,147,0.12)' : 'transparent',
+    border: isActive ? '1px solid rgba(0,166,147,0.25)' : '1px solid transparent',
+    textDecoration: 'none',
+    transition: 'all 0.15s',
+  });
 
-        {/* Logo */}
-        <div className="flex items-center gap-3">
-          <div className="relative w-8 h-8 flex items-center justify-center">
-            <div className="absolute inset-0 bg-brand-500/30 rounded-lg blur-sm" />
-            <span className="relative text-xl">🛡️</span>
+  return (
+    <header style={{
+      position: 'sticky',
+      top: 0,
+      zIndex: 50,
+      height: 56,
+      display: 'flex',
+      alignItems: 'center',
+      background: 'rgba(6,14,22,0.92)',
+      backdropFilter: 'blur(24px)',
+      borderBottom: '1px solid rgba(0,166,147,0.15)',
+      fontFamily: "'Inter', sans-serif",
+    }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+        @keyframes navPing { 75%, 100% { transform: scale(2); opacity: 0; } }
+        @keyframes navGlow { 0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); } 50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); } }
+        .nav-link-item:hover { color: white !important; background: rgba(255,255,255,0.05) !important; }
+        .nav-signout:hover { color: white !important; background: rgba(239,68,68,0.1) !important; border-color: rgba(239,68,68,0.25) !important; }
+        .nav-btn:hover { background: rgba(0,166,147,0.12) !important; border-color: rgba(0,166,147,0.3) !important; color: #00A693 !important; }
+      `}</style>
+
+      <div style={{ width: '100%', maxWidth: '100%', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+
+        {/* ── Brand ───────────────────────────── */}
+        <NavLink to={user ? (role === 'admin' ? '/admin' : role === 'coordinator' ? '/dashboard' : '/citizen') : '/'} style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none', flexShrink: 0, minWidth: 160 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#00A693', boxShadow: '0 0 14px rgba(0,166,147,0.35)', flexShrink: 0 }}>
+            <Shield size={16} color="white" />
           </div>
           <div>
-            <span className="font-bold text-white text-sm sm:text-base">CivicShield<span className="text-brand-400"> AI</span></span>
-            <span className="ml-1 text-xs text-slate-500 hidden sm:inline">🇮🇳</span>
-            {criticalCount > 0 && (
-              <span className="ml-2 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full animate-pulse">
-                {criticalCount} <span className="hidden sm:inline">CRITICAL</span>
-              </span>
-            )}
+            <div style={{ fontWeight: 800, fontSize: 13, color: 'white', lineHeight: 1.2 }}>
+              CivicShield <span style={{ color: '#00A693' }}>AI</span>
+            </div>
+            <div style={{ fontSize: 9, color: '#475569', lineHeight: 1, letterSpacing: '0.05em', textTransform: 'uppercase' }}>India</div>
           </div>
+
+          {/* Global Critical alert badge (hidden on portal because it has a ticker) */}
+          {criticalCount > 0 && !isPortal && (
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', marginLeft: 6 }}>
+              <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 999, background: '#ef4444', color: 'white', letterSpacing: '0.03em' }}>
+                {criticalCount} CRITICAL
+              </span>
+              <div style={{ position: 'absolute', inset: 0, borderRadius: 999, background: '#ef4444', opacity: 0.4, animation: 'navPing 1.5s ease infinite' }} />
+            </div>
+          )}
+        </NavLink>
+
+        {/* ── Center Content ───────────────────────── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 20, flex: 1, justifyContent: isPortal ? 'flex-start' : 'center', marginLeft: isPortal ? 20 : 0 }}>
+          
+          {isPortal ? (
+            /* PORTAL STATS BAR (Integrated) */
+            <>
+              {/* Stat pills */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                {[
+                  { label: 'Total Events',  value: eventStats.total || 0,             color: '#94a3b8' },
+                  { label: 'Active',        value: activeCount,                       color: '#00A693' },
+                  { label: 'Critical',      value: eventStats.bySeverity?.Critical || 0, color: '#ef4444' },
+                  { label: 'High',          value: eventStats.bySeverity?.High || 0,    color: '#f97316' },
+                ].map(s => (
+                  <div key={s.label} style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                    <span style={{ fontSize: 16, fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.value}</span>
+                    <span style={{ fontSize: 10, color: '#475569', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</span>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.06)' }} />
+
+              {/* Critical Ticker */}
+              {criticalCount > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 12px', borderRadius: 99, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', animation: 'navGlow 2s ease-in-out infinite' }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4444', flexShrink: 0 }} />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#ef4444' }}>
+                    {criticalCount} CRITICAL ALERT{criticalCount > 1 ? 'S' : ''}
+                  </span>
+                </div>
+              )}
+            </>
+          ) : (
+            /* REGULAR NAV LINKS */
+            <nav style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              {navLinks.map(link => (
+                <NavLink key={link.to} to={link.to} className="nav-link-item" style={({ isActive }) => navLinkStyle(isActive)}>
+                  {t(link.label) || link.label}
+                </NavLink>
+              ))}
+              {!user && (
+                <NavLink to="/portal" className="nav-link-item" style={({ isActive }) => navLinkStyle(isActive)}>
+                  Public Portal
+                </NavLink>
+              )}
+            </nav>
+          )}
+
         </div>
 
-        {/* Navigation */}
-        <nav className="flex items-center gap-1 sm:gap-2" aria-label="Main navigation">
-          <NavLink to="/portal" className={navLinkClass} id="nav-portal">
-            <span className="hidden sm:inline">{t('nav.portal')}</span>
-            <span className="sm:hidden text-lg" title={t('nav.portal')}>🌍</span>
-          </NavLink>
-          {role === 'coordinator' && (
-            <NavLink to="/dashboard" className={navLinkClass} id="nav-dashboard">
-              <span className="hidden sm:inline">{t('nav.dashboard')}</span>
-              <span className="sm:hidden text-lg" title={t('nav.dashboard')}>🎯</span>
-            </NavLink>
-          )}
-          {(role === 'responder' || role === 'coordinator') && (
-            <NavLink to="/responder" className={navLinkClass} id="nav-responder">
-              <span className="hidden sm:inline">{t('nav.responder')}</span>
-              <span className="sm:hidden text-lg" title={t('nav.responder')}>📱</span>
-            </NavLink>
-          )}
-        </nav>
+        {/* ── Right side ──────────────────────── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
 
-        {/* Right side */}
-        <div className="flex items-center gap-3">
-          {lastUpdate && (
-            <span className="text-xs text-slate-500 hidden md:block">
-              {t('nav.updated')} {lastUpdate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+          {isPortal && (
+            /* Portal Toggles */
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 8 }}>
+              <button onClick={() => setPortalRightOpen(!portalRightOpen)} className="nav-btn"
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.09)', background: 'rgba(255,255,255,0.03)', color: portalRightOpen ? '#00A693' : '#64748b', fontSize: 11, fontWeight: 600, transition: 'all 0.15s', cursor: 'pointer' }}>
+                <AlertTriangle size={12} /> Alerts
+              </button>
+            </div>
+          )}
+
+          {/* Last update */}
+          {lastUpdate && !isPortal && (
+            <span style={{ fontSize: 11, color: '#475569' }} className="hidden-mobile">
+              Updated {lastUpdate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
             </span>
           )}
 
           {/* Language switcher */}
-          <div className="hidden sm:flex items-center rounded-lg overflow-hidden border border-white/10" role="group" aria-label="Language switcher">
+          <div style={{ display: 'flex', alignItems: 'center', borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)' }}>
             {LANGUAGES.map((lang) => (
-              <button
-                key={lang.code}
-                id={`lang-${lang.code}`}
-                onClick={() => setLanguage(lang.code)}
-                title={lang.nativeLabel}
-                className={`px-2.5 py-1 text-xs font-semibold transition-all duration-200 ${
-                  language === lang.code
-                    ? 'bg-brand-600/40 text-brand-300'
-                    : 'text-slate-500 hover:text-white hover:bg-white/5'
-                }`}
-              >
+              <button key={lang.code} onClick={() => setLanguage(lang.code)} title={lang.nativeLabel}
+                style={{
+                  padding: '5px 9px', fontSize: 11, fontWeight: 600, border: 'none', cursor: 'pointer',
+                  background: language === lang.code ? 'rgba(0,166,147,0.2)' : 'transparent',
+                  color: language === lang.code ? '#00A693' : '#64748b',
+                  transition: 'all 0.15s',
+                }}>
                 {lang.flag} {lang.label}
               </button>
             ))}
           </div>
 
-          {/* Connection indicator */}
-          <div className="flex items-center gap-1.5">
-            <span
-              id="connection-indicator"
-              className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400 animate-pulse' : 'bg-red-500'}`}
-              aria-label={isConnected ? 'Connected' : 'Disconnected'}
-            />
-            <span className={`text-xs font-medium hidden sm:block ${isConnected ? 'text-emerald-400' : 'text-red-400'}`}>
-              {isConnected ? t('nav.live') : t('nav.offline')}
+          {/* Live / Offline indicator */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginLeft: 4 }}>
+            <div style={{ position: 'relative', width: 8, height: 8, flexShrink: 0 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: isConnected ? '#10b981' : '#ef4444', position: 'relative', zIndex: 1 }} />
+              {isConnected && <div style={{ position: 'absolute', inset: -2, borderRadius: '50%', background: '#10b981', opacity: 0.4, animation: 'navPing 2s ease-in-out infinite' }} />}
+            </div>
+            <span style={{ fontSize: 11, fontWeight: 700, color: isConnected ? '#10b981' : '#ef4444' }}>
+              {isConnected ? t('nav.live') || 'Live' : t('nav.offline') || 'Offline'}
             </span>
           </div>
 
-          {/* Auth */}
+          <div style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.06)', margin: '0 4px' }} />
+
+          {/* Auth section */}
           {user ? (
-            <div className="flex items-center gap-2">
-              <span className={`hidden sm:inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${ROLE_COLORS[role] || ROLE_COLORS.citizen}`}>
-                {role}
-              </span>
-              <div className="flex items-center gap-2 glass rounded-lg px-2.5 py-1.5">
-                <div className="w-6 h-6 rounded-full bg-brand-600/50 flex items-center justify-center text-xs font-bold text-brand-300">
-                  {user.email?.[0]?.toUpperCase()}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {/* Role + name pill */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '5px 10px', borderRadius: 9, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ width: 22, height: 22, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: roleConf.color, background: roleConf.bg, border: `1px solid ${roleConf.border}`, flexShrink: 0 }}>
+                  {(profile?.full_name || user.email)?.[0]?.toUpperCase()}
                 </div>
-                <span className="text-xs text-slate-300 hidden md:block max-w-[100px] truncate">
-                  {user.email}
-                </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'white', maxWidth: 90, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {profile?.full_name?.split(' ')[0] || 'User'}
+                  </span>
+                  <span style={{ fontSize: 9, fontWeight: 700, color: roleConf.color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                    {roleBadgeLabel}
+                  </span>
+                </div>
               </div>
-              <button
-                id="nav-signout"
-                onClick={handleSignOut}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition-all border border-white/10"
-              >
-                <span className="hidden sm:inline">Sign Out</span>
-                <span className="sm:hidden">🚪</span>
+
+              {/* Sign out */}
+              <button id="nav-signout" onClick={handleSignOut} className="nav-signout"
+                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '6px 11px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'transparent', color: '#64748b', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s' }}>
+                <LogOut size={13} />
+                <span className="hidden-mobile">Sign Out</span>
               </button>
             </div>
           ) : (
-            <NavLink
-              to="/login"
-              id="nav-signin"
-              className="px-3 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-semibold bg-brand-600 hover:bg-brand-500 text-white transition-all whitespace-nowrap"
-            >
-              <span className="hidden sm:inline">🔐 Sign In</span>
-              <span className="sm:hidden">Sign In</span>
+            <NavLink to="/login" id="nav-signin"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 16px', borderRadius: 9, background: '#00A693', color: 'white', fontSize: 12, fontWeight: 700, textDecoration: 'none', boxShadow: '0 4px 14px rgba(0,166,147,0.3)' }}>
+              Sign In
             </NavLink>
           )}
         </div>
