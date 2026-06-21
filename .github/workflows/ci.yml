@@ -82,7 +82,7 @@ jobs:
         run: |
           # Fail if a real-looking secret appears OUTSIDE example/lock files.
           if git grep -nIE "(service_role.*eyJ|sk_live_|re_[A-Za-z0-9]{20,}|AC[a-f0-9]{32}|SUPABASE_SERVICE_KEY *= *eyJ)" \
-               -- . ':(exclude)*.example' ':(exclude)*.lock' ':(exclude)package-lock.json' ; then
+               -- . ':(exclude)*.example' ':(exclude)*.lock' ':(exclude)package-lock.json' ':(exclude).github/workflows/ci.yml' ; then
             echo "::error::Potential secret detected in a tracked file"; exit 1
           fi
           echo "No obvious secrets found."
