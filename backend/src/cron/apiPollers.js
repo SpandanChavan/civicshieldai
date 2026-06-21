@@ -294,4 +294,4 @@ function startCronJobs(io) {
   // }
 }
 
-module.exports = { startCronJobs };
+module.exports = { startCronJobs, upsertEvents };

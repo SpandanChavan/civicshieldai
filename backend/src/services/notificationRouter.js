@@ -294,4 +294,4 @@ async function routeAlert(alert, channels = [], recipients = {}) {
   return results;
 }
 
-module.exports = { sendEmail, sendTelegram, sendWhatsApp, sendSMS, sendWebPush, translateText, routeAlert };
+module.exports = { sendEmail, sendTelegram, sendWhatsApp, sendSMS, sendWebPush, translateText, routeAlert, escapeHtml };
