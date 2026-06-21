@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/useAuth';
 import { resourcesApi } from '@/services/backendApi';
 
 const RESOURCE_TYPES = ['ambulance', 'fire_truck', 'helicopter', 'shelter', 'food', 'water', 'medical', 'rescue_team', 'other'];
@@ -12,6 +13,7 @@ const STATUS_COLORS = {
 
 export default function ResourcePanel() {
   const queryClient = useQueryClient();
+  const { profile } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [newResource, setNewResource] = useState({ name: '', type: 'ambulance', quantity: 1, status: 'available' });
 
@@ -59,6 +61,13 @@ export default function ResourcePanel() {
           </div>
         ))}
       </div>
+
+      {profile?.states && (
+        <div className="flex items-center justify-between text-xs font-semibold text-slate-400 uppercase tracking-wider px-1">
+          <span>Resources Scope</span>
+          <span className="text-brand-400">📍 {profile.states.name}</span>
+        </div>
+      )}
 
       {/* Add Resource Button */}
       <button

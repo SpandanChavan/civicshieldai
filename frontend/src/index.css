@@ -12,8 +12,8 @@
   --color-high:     #f59e0b;
   --color-medium:   #3b82f6;
   --color-low:      #10b981;
-  --glass-bg:       rgba(15, 23, 42, 0.8);
-  --glass-border:   rgba(255, 255, 255, 0.08);
+  --glass-bg:       rgba(6, 14, 22, 0.85);
+  --glass-border:   rgba(0, 166, 147, 0.15);
 }
 
 /* ── Base Resets ────────────────────────────────────── */
@@ -41,16 +41,7 @@ body {
 
 /* ── Glassmorphism Utility ──────────────────────────── */
 @layer components {
-  .glass {
-    background: var(--glass-bg);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--glass-border);
-  }
 
-  .glass-card {
-    @apply glass rounded-xl p-4 shadow-lg;
-  }
 
   /* ── Severity Badges ──────────────────────────────── */
   .severity-badge {
@@ -77,6 +68,18 @@ body {
     @apply w-full px-3 py-2 rounded-lg bg-surface-700 border border-white/10 text-white
            placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500
            focus:border-transparent transition-colors text-sm;
+  }
+
+  /* ── Glassmorphism Utility ──────────────────────────── */
+  .glass {
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+  }
+
+  .glass-card {
+    @apply glass rounded-xl p-4 shadow-lg;
   }
 
   /* ── Pulse Ring Animation for alerts ─────────────── */

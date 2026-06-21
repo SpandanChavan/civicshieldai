@@ -7,6 +7,7 @@
 
 -- Verify PostGIS is enabled before running:
 -- SELECT PostGIS_Version();
+CREATE EXTENSION IF NOT EXISTS postgis WITH SCHEMA extensions;
 
 -- ── TABLE 1: events ──────────────────────────────────
 CREATE TABLE events (

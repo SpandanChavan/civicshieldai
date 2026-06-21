@@ -2,7 +2,6 @@ import { useState, Component } from 'react';
 import DisasterMap from '@/components/map/DisasterMap';
 import MapLayers from '@/components/map/MapLayers';
 import IMDLegend from '@/components/map/IMDLegend';
-import { useDisasterEvents } from '@/hooks/useDisasterEvents';
 
 // ── Verbose Error Boundary — shows error in DOM so it's debuggable ──────────
 class ErrorBoundary extends Component {
@@ -38,7 +37,7 @@ class ErrorBoundary extends Component {
 
 export default function CoordinatorDashboardPage() {
   const [selectedEvent, setSelectedEvent] = useState(null);
-  useDisasterEvents();
+  // Events are fetched globally in App.jsx via GlobalEventFetcher
 
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 56px)', overflow: 'hidden' }}>
@@ -47,23 +46,23 @@ export default function CoordinatorDashboardPage() {
       <aside style={{ width: '384px', flexShrink: 0, borderRight: '1px solid rgba(255,255,255,0.05)', overflowY: 'auto' }}
              className="glass flex flex-col">
         <ErrorBoundary label="CoordinatorDashboard">
-          <LazyCoordinatorDashboard />
+          <LazyCoordinatorDashboard selectedEvent={selectedEvent} setSelectedEvent={setSelectedEvent} />
         </ErrorBoundary>
       </aside>
 
       {/* Right — map view */}
       <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
         <ErrorBoundary label="DisasterMap">
-          <DisasterMap onEventSelect={setSelectedEvent} />
+          <DisasterMap onEventSelect={setSelectedEvent} applyJurisdictionFilter={true} />
         </ErrorBoundary>
         <MapLayers />
         {/* 🌦️ IMD Legend bottom-left */}
         <div className="absolute bottom-4 left-4 z-[1000] pointer-events-auto">
           <IMDLegend />
         </div>
-        <div className="absolute top-4 right-4 z-[1000]">
-          <div className="glass rounded-xl px-4 py-2 text-xs text-slate-400 border border-white/5">
-            🗺️ OpenStreetMap · Real-time · No API key
+        <div className="absolute bottom-4 right-4 z-[1000]">
+          <div className="glass rounded-xl px-3 py-1.5 text-[10px] text-slate-400 border border-white/5">
+            OpenStreetMap · Real-time · No API key
           </div>
         </div>
       </div>
@@ -74,10 +73,10 @@ export default function CoordinatorDashboardPage() {
 // Lazy import so a module-load error surfaces in the ErrorBoundary above
 import { lazy, Suspense } from 'react';
 const LazyCoordinatorDashboardComp = lazy(() => import('@/components/dashboard/CoordinatorDashboard'));
-function LazyCoordinatorDashboard() {
+function LazyCoordinatorDashboard({ selectedEvent, setSelectedEvent }) {
   return (
     <Suspense fallback={<div style={{ padding: 24, color: '#888' }}>Loading dashboard…</div>}>
-      <LazyCoordinatorDashboardComp />
+      <LazyCoordinatorDashboardComp selectedMapEvent={selectedEvent} onClearMapEvent={() => setSelectedEvent(null)} />
     </Suspense>
   );
 }

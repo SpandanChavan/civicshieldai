@@ -1,49 +1,49 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import useAppStore from '@/store/useAppStore';
 import PinSearch from './PinSearch';
+import { Globe, MapPin, Mountain, Filter, Layers, ChevronDown, X, Map } from 'lucide-react';
 
 const EVENT_TYPES = [
-  'all', 'Earthquake', 'Wildfire', 'Flood',
-  'Cyclone', 'Tsunami', 'Volcano', 'Landslide',
-  'Drought', 'Heatwave', 'Cold Wave', 'Natural Event',
+  'all', 'Earthquake', 'Wildfire', 'Flood', 'Cyclone', 
+  'Tsunami', 'Volcano', 'Landslide', 'Drought', 'Heatwave', 'Cold Wave'
 ];
+
 const SEVERITIES = ['all', 'Critical', 'High', 'Medium', 'Low'];
 
-function fitAllEvents() {
-  // DisasterMap exposes the Leaflet instance on window for this purpose
-  const map = window.__civicshieldMap;
-  const events = useAppStore.getState().events;
-  if (!map || !events.length) return;
-
-  const coords = events
-    .filter(e => typeof e.lat === 'number' && typeof e.lon === 'number')
-    .map(e => [e.lat, e.lon]);
-
-  if (coords.length === 0) return;
-  try {
-    const L = window.L || map.options._L;
-    // Build bounds manually
-    let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
-    coords.forEach(([lat, lon]) => {
-      if (lat < minLat) minLat = lat;
-      if (lat > maxLat) maxLat = lat;
-      if (lon < minLon) minLon = lon;
-      if (lon > maxLon) maxLon = lon;
-    });
-    map.fitBounds([[minLat, minLon], [maxLat, maxLon]], { padding: [40, 40], maxZoom: 8 });
-  } catch (e) {
-    console.warn('fitAllEvents failed:', e.message);
-  }
-}
-
 export default function MapLayers() {
+  const events = useAppStore((s) => s.events);
   const filters = useAppStore((s) => s.filters);
   const setFilter = useAppStore((s) => s.setFilter);
   const clearStateFilter = useAppStore((s) => s.clearStateFilter);
-  const events = useAppStore((s) => s.events);
   const setUserLocation = useAppStore((s) => s.setUserLocation);
-  const [showFilters, setShowFilters] = useState(false);
   
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false);
+  const [layersMenuOpen, setLayersMenuOpen] = useState(false);
+  const filterMenuRef = useRef(null);
+  const layersMenuRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (filterMenuRef.current && !filterMenuRef.current.contains(e.target)) setFilterMenuOpen(false);
+      if (layersMenuRef.current && !layersMenuRef.current.contains(e.target)) setLayersMenuOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const fitAllEvents = () => {
+    const map = window.__civicshieldMap;
+    if (!map || !events.length) return;
+    const coords = events.filter(e => typeof e.lat === 'number' && typeof e.lon === 'number').map(e => [e.lat, e.lon]);
+    if (!coords.length) return;
+    let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+    coords.forEach(([lat, lon]) => {
+      if (lat < minLat) minLat = lat; if (lat > maxLat) maxLat = lat;
+      if (lon < minLon) minLon = lon; if (lon > maxLon) maxLon = lon;
+    });
+    try { map.fitBounds([[minLat, minLon], [maxLat, maxLon]], { padding: [40, 40], maxZoom: 8 }); } catch (_) {}
+  };
+
   const handleLocateMe = () => {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
@@ -51,146 +51,155 @@ export default function MapLayers() {
           const loc = { lat: pos.coords.latitude, lon: pos.coords.longitude };
           setUserLocation(loc);
           const map = window.__civicshieldMap;
-          if (map) {
-            map.flyTo([loc.lat, loc.lon], 10, { duration: 1.2 });
-          }
+          if (map) map.flyTo([loc.lat, loc.lon], 10, { duration: 1.2 });
         },
-        (err) => {
-          alert('Unable to retrieve location: ' + err.message);
-        }
+        (err) => alert('Cannot access location: ' + err.message)
       );
-    } else {
-      alert('Geolocation is not supported by your browser');
     }
   };
 
   return (
-    <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2 pointer-events-auto w-[calc(100vw-32px)] md:w-auto md:max-w-[200px]">
-      <div className="flex gap-2 items-start w-full">
-        <div className="flex-1 max-w-[220px]">
-          {/* 🇮🇳 PIN Code / City Search */}
-          <PinSearch />
-        </div>
-        <button 
-          onClick={() => setShowFilters(!showFilters)}
-          className="md:hidden glass rounded-xl px-3 py-2 text-xs text-white hover:bg-white/10"
-        >
-          {showFilters ? '✕' : '⚙️ Filters'}
-        </button>
+    <div className="absolute top-4 left-4 z-[1000] flex items-start gap-3 pointer-events-none">
+      
+      {/* 1. Global PinSearch */}
+      <div className="pointer-events-auto shadow-xl rounded-xl">
+        <PinSearch />
       </div>
 
-      {/* Active state filter badge */}
-      {filters.stateFilter && (
-        <div className="glass rounded-xl px-3 py-2 flex items-center justify-between gap-2">
-          <span className="text-xs text-slate-300">🇮🇳 {filters.stateFilter}</span>
-          <button
-            onClick={clearStateFilter}
-            className="text-xs text-slate-500 hover:text-red-400 transition-colors"
-            title="Clear state filter"
-          >✕ Clear</button>
-        </div>
-      )}
-      {/* Fit all / Zoom India buttons */}
-      <div className="flex gap-2">
+      {/* 2. Main Map Action Bar */}
+      <div className="flex gap-1.5 glass p-1.5 rounded-2xl shadow-xl pointer-events-auto">
+        
+        {/* Fit All Button */}
         <button
-          id="btn-fit-all"
           onClick={fitAllEvents}
           title="Zoom to show all events worldwide"
-          className="glass rounded-xl px-3 py-2 text-xs text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-2"
+          className="btn btn-ghost px-3 py-1.5 text-xs rounded-xl flex items-center gap-1.5"
         >
-          🌍 Fit All ({events.filter(e => e.is_active).length})
+          <Globe size={14} /> Fit All <span className="opacity-50 text-[10px]">({events.filter(e => e.is_active).length})</span>
         </button>
+        <div className="w-px h-6 bg-white/10 self-center mx-0.5"></div>
+          
         <button
-          id="btn-zoom-india"
           onClick={() => {
             const map = window.__civicshieldMap;
             if (map) map.flyTo([22.5, 80.0], 5, { duration: 1.2 });
           }}
           title="Zoom to India"
-          className="glass rounded-xl px-3 py-2 text-xs text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-2"
+          className="btn btn-ghost px-3 py-1.5 text-xs rounded-xl flex items-center gap-1.5"
         >
-          🇮🇳 India
+          <Map size={14} /> IN
         </button>
+        <div className="w-px h-6 bg-white/10 self-center mx-0.5"></div>
+
+        {/* Locate Me Button */}
         <button
-          id="btn-locate-me"
           onClick={handleLocateMe}
-          title="Find My Location"
-          className="glass rounded-xl px-3 py-2 text-xs text-slate-300 hover:text-white hover:bg-white/10 transition-colors flex items-center gap-2"
+          title="Zoom to my location"
+          className="btn btn-ghost px-3 py-1.5 text-xs rounded-xl flex items-center gap-1.5"
         >
-          📍 Locate Me
+          <MapPin size={14} /> Me
         </button>
-      </div>
-
-      {/* Filter Sections (Hidden on mobile unless toggled) */}
-      <div className={`flex flex-col gap-2 ${showFilters ? 'flex' : 'hidden md:flex'}`}>
-        
-        {/* Event Type Filter */}
-        <div className="glass rounded-xl p-3 min-w-[160px]">
-        <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-2">Event Type</p>
-        <div className="flex flex-col gap-1">
-          {EVENT_TYPES.map((type) => (
-            <button
-              key={type}
-              id={`filter-type-${type.replace(' ', '-')}`}
-              onClick={() => setFilter('eventType', type)}
-              className={`text-left text-sm px-3 py-1.5 rounded-lg transition-colors ${
-                filters.eventType === type
-                  ? 'bg-brand-600 text-white'
-                  : 'text-slate-300 hover:bg-white/10'
-              }`}
-            >
-              {type === 'all' ? 'All Types' : type}
-            </button>
-          ))}
+        <div className="w-px h-6 bg-white/10 self-center mx-0.5"></div>
+          
+        <div className="relative" ref={filterMenuRef}>
+          <button
+            onClick={() => {
+              setFilterMenuOpen(!filterMenuOpen);
+              setLayersMenuOpen(false);
+            }}
+            className={`btn btn-ghost px-3 py-1.5 text-xs rounded-xl flex items-center gap-1.5 ${filterMenuOpen || filters.eventType !== 'all' || filters.severity !== 'all' ? 'bg-white/10 text-white' : ''}`}
+          >
+            <Filter size={14} /> Filters <ChevronDown size={12} className={`transition-transform ${filterMenuOpen ? 'rotate-180' : ''}`} />
+          </button>
+          
+          {/* Filters Popover */}
+          {filterMenuOpen && (
+            <div className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 glass rounded-2xl p-4 w-[300px] shadow-2xl animate-in fade-in slide-in-from-top-2">
+              <div className="flex items-center justify-between mb-3 border-b border-white/5 pb-2">
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Event Type</p>
+              </div>
+              <div className="flex flex-wrap gap-1.5 mb-4">
+                {EVENT_TYPES.map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setFilter('eventType', type)}
+                    className={`text-xs px-2.5 py-1.5 rounded-lg transition-colors border ${
+                      filters.eventType === type
+                        ? 'bg-brand-600 border-brand-500 text-white shadow-md shadow-brand-500/20'
+                        : 'bg-white/5 border-white/5 text-slate-300 hover:bg-white/10'
+                    }`}
+                  >
+                    {type === 'all' ? 'All Types' : type}
+                  </button>
+                ))}
+              </div>
+            
+              <div>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-2 px-1">Severity</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {SEVERITIES.map((sev) => (
+                    <button
+                      key={sev}
+                      onClick={() => setFilter('severity', sev)}
+                      className={`text-xs px-2.5 py-1.5 rounded-lg transition-colors border ${
+                        filters.severity === sev
+                          ? 'bg-brand-600 border-brand-500 text-white shadow-md shadow-brand-500/20'
+                          : 'bg-white/5 border-white/5 text-slate-300 hover:bg-white/10'
+                      }`}
+                    >
+                      {sev === 'all' ? 'All' : (
+                        <span className={`severity-${sev.toLowerCase()} flex items-center gap-1.5`}>
+                          <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80" /> {sev}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
-      </div>
 
-      {/* Severity Filter */}
-      <div className="glass rounded-xl p-3 min-w-[160px]">
-        <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-2">Severity</p>
-        <div className="flex flex-col gap-1">
-          {SEVERITIES.map((sev) => (
-            <button
-              key={sev}
-              id={`filter-severity-${sev}`}
-              onClick={() => setFilter('severity', sev)}
-              className={`text-left text-sm px-3 py-1.5 rounded-lg transition-colors ${
-                filters.severity === sev
-                  ? 'bg-brand-600 text-white'
-                  : 'text-slate-300 hover:bg-white/10'
-              }`}
-            >
-              {sev === 'all' ? 'All' : (
-                <span className={`severity-${sev.toLowerCase()}`}>{sev}</span>
-              )}
-            </button>
-          ))}
+        <div className="relative" ref={layersMenuRef}>
+          <button
+            onClick={() => {
+              setLayersMenuOpen(!layersMenuOpen);
+              setFilterMenuOpen(false);
+            }}
+            className={`btn btn-ghost px-3 py-1.5 text-xs rounded-xl flex items-center gap-1.5 ${layersMenuOpen ? 'bg-white/10 text-white' : ''}`}
+          >
+            <Layers size={14} /> Layers <ChevronDown size={12} className={`transition-transform ${layersMenuOpen ? 'rotate-180' : ''}`} />
+          </button>
+          
+          {/* Layers Popover */}
+          {layersMenuOpen && (
+            <div className="absolute top-[calc(100%+8px)] right-0 glass rounded-2xl p-4 w-[220px] shadow-2xl animate-in fade-in slide-in-from-top-2">
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-3 px-1">Map Overlays</p>
+              <div className="flex flex-col gap-1">
+                {[
+                  { key: 'showClusters',    label: 'Cluster Markers', icon: <Layers size={14} className="text-blue-400" /> },
+                  { key: 'showResources',   label: 'Resources',       icon: <MapPin size={14} className="text-emerald-400" /> },
+                  { key: 'showHeatmap',     label: 'Heat Map',        icon: <div className="w-3.5 h-3.5 rounded-full bg-gradient-to-tr from-red-500 to-yellow-500" /> },
+                  { key: 'showSeismicZones',label: 'Seismic Zones',   icon: <Mountain size={14} className="text-orange-400" /> },
+                ].map(({ key, label, icon }) => (
+                  <label key={key} className="flex items-center justify-between cursor-pointer p-2 rounded-lg hover:bg-white/5 transition-colors group">
+                    <div className="flex items-center gap-2.5">
+                      {icon}
+                      <span className="text-sm font-medium text-slate-300 group-hover:text-white transition-colors">{label}</span>
+                    </div>
+                    <input
+                      type="checkbox"
+                      checked={filters[key] ?? (key === 'showSeismicZones' ? true : filters[key])}
+                      onChange={(e) => setFilter(key, e.target.checked)}
+                      className="accent-brand-500 w-4 h-4 rounded border-white/20 bg-white/10"
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
-      </div>
-
-      {/* Toggle Options */}
-      <div className="glass rounded-xl p-3">
-        <p className="text-xs text-slate-400 font-medium uppercase tracking-wide mb-2">Layers</p>
-        {[
-          { key: 'showClusters',    label: 'Cluster Markers' },
-          { key: 'showResources',   label: 'Resources' },
-          { key: 'showHeatmap',     label: 'Heat Map' },
-          { key: 'showSeismicZones',label: '🏔️ Seismic Zones' },
-        ].map(({ key, label }) => (
-          <label key={key} className="flex items-center gap-2 cursor-pointer py-1">
-            <input
-              id={`toggle-${key}`}
-              type="checkbox"
-              checked={filters[key] ?? (key === 'showSeismicZones' ? true : filters[key])}
-              onChange={(e) => setFilter(key, e.target.checked)}
-              className="accent-brand-500 w-4 h-4"
-            />
-            <span className="text-sm text-slate-300">{label}</span>
-          </label>
-        ))}
-      </div>
       </div>
     </div>
   );
 }
-

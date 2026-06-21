@@ -26,6 +26,9 @@ router.get('/', async (req, res) => {
     let query = getDb().from('resources').select('*').limit(Number(limit));
     if (type) query = query.eq('type', type);
     if (status) query = query.eq('status', status);
+    if (req.userRole === 'coordinator' && req.userStateId) {
+      query = query.eq('state_id', req.userStateId);
+    }
     const { data, error } = await query;
     if (error) throw error;
     res.json({ data });
@@ -40,12 +43,19 @@ router.post('/', async (req, res) => {
   if (!parsed.success) {
     return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
   }
+  if (req.userRole === 'coordinator' && req.userStateId) {
+    req.body.state_id = req.userStateId;
+  } else if (req.userRole !== 'admin') {
+    return res.status(403).json({ error: 'State assignment required to manage resources' });
+  }
+
   const { location, ...rest } = parsed.data;
   try {
     const { data, error } = await getDb()
       .from('resources')
       .insert({
         ...rest,
+        state_id: req.body.state_id,
         ...(location && {
           location: `SRID=4326;POINT(${location.lon} ${location.lat})`,
         }),
@@ -66,11 +76,29 @@ router.post('/', async (req, res) => {
 });
 
 // ── PATCH /api/resources/:id ──────────────────────────
+// Partial update — validate the subset of fields provided (no blind req.body spread)
+const ResourceUpdateSchema = ResourceSchema.partial().extend({
+  assigned_event: z.string().uuid().nullable().optional(),
+}).strict();
+
 router.patch('/:id', async (req, res) => {
+  const parsed = ResourceUpdateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
+  }
+
+  // Convert a {lat,lon} location (if supplied) to PostGIS WKT
+  const { location, ...rest } = parsed.data;
+  const updates = {
+    ...rest,
+    ...(location && { location: `SRID=4326;POINT(${location.lon} ${location.lat})` }),
+    updated_at: new Date().toISOString(),
+  };
+
   try {
     const { data, error } = await getDb()
       .from('resources')
-      .update({ ...req.body, updated_at: new Date().toISOString() })
+      .update(updates)
       .eq('id', req.params.id)
       .select()
       .single();

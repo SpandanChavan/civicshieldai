@@ -1,9 +1,17 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 
+// Maps each role to its home route (used for wrong-role redirects)
+const ROLE_HOME = {
+  coordinator: '/dashboard',
+  citizen:     '/citizen',
+  admin:       '/admin',
+};
+
 /**
- * Wraps a route and redirects unauthenticated users to /login.
- * If `roles` is provided, also checks that the user's role is in the list.
+ * Wraps a route and:
+ * 1. Redirects unauthenticated users → /login (preserving intended destination)
+ * 2. Redirects wrong-role users → their own home (instead of showing a dead-end error)
  *
  * @param {string[]} roles - Allowed roles. If empty/undefined, any logged-in user is allowed.
  */
@@ -28,20 +36,10 @@ export default function ProtectedRoute({ children, roles = [] }) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Logged in but wrong role
+  // Logged in but wrong role → redirect to their correct home
   if (roles.length > 0 && !roles.includes(role)) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-surface-900">
-        <div className="glass-card max-w-sm text-center p-8 space-y-4">
-          <div className="text-5xl">🚫</div>
-          <h2 className="text-xl font-bold text-white">Access Denied</h2>
-          <p className="text-slate-400 text-sm">
-            Your role (<span className="text-brand-400 font-semibold">{role}</span>) does not have
-            permission to view this page.
-          </p>
-        </div>
-      </div>
-    );
+    const home = ROLE_HOME[role] || '/portal';
+    return <Navigate to={home} replace />;
   }
 
   return children;

@@ -1,5 +1,5 @@
 const cron = require('node-cron');
-const { createClient } = require('@supabase/supabase-js');
+const { getAdminDb } = require('../lib/db');
 const { fetchEarthquakes } = require('../services/usgsEarthquake');
 const { fetchFireHotspots } = require('../services/nasaFirms');
 const { fetchGdacsAlerts, fetchEonetEvents } = require('../services/gdacs');
@@ -9,16 +9,12 @@ const { fetchNCSEarthquakes } = require('../services/ncs');       // 🇮🇳 NC
 const { fetchCWCFloodData } = require('../services/cwc');         // 🇮🇳 CWC River Flood Data
 const { routeAlert } = require('../services/notificationRouter');
 
-let supabase;
+// India bounding box — events inside this bbox are handled by NCS (m5 dedup fix)
+const INDIA_BBOX = { minLat: 6, maxLat: 38, minLon: 68, maxLon: 98 };
 
-function getSupabase() {
-  if (!supabase) {
-    supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_KEY
-    );
-  }
-  return supabase;
+function isInIndia(lat, lon) {
+  return lat >= INDIA_BBOX.minLat && lat <= INDIA_BBOX.maxLat &&
+         lon >= INDIA_BBOX.minLon && lon <= INDIA_BBOX.maxLon;
 }
 
 /**
@@ -27,15 +23,35 @@ function getSupabase() {
  */
 async function upsertEvents(events, io, eventType) {
   if (!events.length) return;
-  const db = getSupabase();
+  const db = getAdminDb(); // m5: singleton
 
-  // Format location as WKT POINT for PostGIS
-  const formatted = events.map((e) => ({
-    ...e,
-    location: e.location
-      ? `SRID=4326;POINT(${e.location.lon} ${e.location.lat})`
-      : null,
-  }));
+  // Resolve state_id per event (N2). Cache by rounded coords (~1km) so nearby
+  // points in the same batch don't each incur a get_state_from_point round-trip.
+  const stateCache = new Map();
+  async function resolveStateId(lat, lon) {
+    const key = `${lat.toFixed(2)},${lon.toFixed(2)}`;
+    if (stateCache.has(key)) return stateCache.get(key);
+    let state_id = null;
+    try {
+      const { data } = await db.rpc('get_state_from_point', { lat, lon });
+      if (data) state_id = data;
+    } catch (err) {}
+    stateCache.set(key, state_id);
+    return state_id;
+  }
+
+  // Format location as WKT POINT for PostGIS and resolve state_id (N2 FIX)
+  const formatted = [];
+  for (const e of events) {
+    const state_id = e.location ? await resolveStateId(e.location.lat, e.location.lon) : null;
+    formatted.push({
+      ...e,
+      state_id,
+      location: e.location
+        ? `SRID=4326;POINT(${e.location.lon} ${e.location.lat})`
+        : null,
+    });
+  }
 
   const { error, data } = await db
     .from('events')
@@ -48,29 +64,33 @@ async function upsertEvents(events, io, eventType) {
   }
 
   console.log(`[Cron] ${eventType}: upserted ${data?.length || 0} events`);
-  io.emit('events:updated', { type: eventType, count: data?.length || 0 });
+  // M3 FIX: emit to 'public' room (all clients) instead of io.emit (no room scoping)
+  io.to('public').emit('events:updated', { type: eventType, count: data?.length || 0 });
 
   // Auto-alerting for India-specific high/critical events (Proxy for SACHET)
   if (eventType === 'India' && data?.length > 0) {
+    // Deterministic (replaces the fragile updated_at−created_at<1s heuristic):
+    // alert only high/critical events that have not been alerted yet.
     const newCriticalEvents = data.filter((e) => {
       const isHighSeverity = e.severity === 'Critical' || e.severity === 'High';
-      const isNew = new Date(e.updated_at).getTime() - new Date(e.created_at).getTime() < 1000;
-      return isHighSeverity && isNew;
+      return isHighSeverity && !e.alerted_at;
     });
 
     for (const ev of newCriticalEvents) {
       console.log(`[Cron] Auto-dispatching alert for ${ev.title}`);
-      
+
       const alertPayload = {
         title: ev.title,
         body: ev.description,
         severity: ev.severity,
-        status: 'sending'
+        status: 'sending',
+        event_id: ev.id,
+        state_id: ev.state_id || null,
       };
 
       // Create an alert record
       const { data: alertRecord } = await db.from('alerts').insert(alertPayload).select().single();
-      
+
       if (alertRecord) {
         // Send via all channels. We use default env var recipients since it's automated.
         // In a real app, you'd fetch subscribed users based on region.
@@ -79,12 +99,41 @@ async function upsertEvents(events, io, eventType) {
           whatsappNumbers: process.env.DEFAULT_WHATSAPP_NUMBER ? [process.env.DEFAULT_WHATSAPP_NUMBER] : [],
           smsNumbers: process.env.DEFAULT_SMS_NUMBER ? [process.env.DEFAULT_SMS_NUMBER] : [],
         };
-        
+
         await routeAlert(alertRecord, ['telegram', 'whatsapp', 'sms', 'web_push'], recipients);
         await db.from('alerts').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('id', alertRecord.id);
+
+        // Stamp the event so it is never auto-alerted again (deterministic, no time heuristic)
+        await db.from('events').update({ alerted_at: new Date().toISOString() }).eq('id', ev.id);
       }
     }
   }
+}
+
+/**
+ * Cleanup stale events from the database automatically.
+ * Different events have different Time-To-Live (TTL) before they expire.
+ */
+async function cleanupStaleEvents() {
+  const db = getAdminDb(); // m5: singleton
+  const now = new Date();
+  
+  // Earthquakes & short-term events older than 48 hours
+  const twoDaysAgo = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString();
+  await db.from('events').update({ is_active: false })
+    .eq('is_active', true).in('event_type', ['Earthquake', 'Tsunami', 'Landslide']).lt('detected_at', twoDaysAgo);
+
+  // Wildfires older than 72 hours
+  const threeDaysAgo = new Date(now.getTime() - 72 * 60 * 60 * 1000).toISOString();
+  await db.from('events').update({ is_active: false })
+    .eq('is_active', true).eq('event_type', 'Wildfire').lt('detected_at', threeDaysAgo);
+
+  // General/long events older than 7 days
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  await db.from('events').update({ is_active: false })
+    .eq('is_active', true).not('event_type', 'in', '("Earthquake","Tsunami","Landslide","Wildfire")').lt('detected_at', sevenDaysAgo);
+    
+  console.log('[Cron] Cleaned up stale events successfully.');
 }
 
 /**
@@ -95,11 +144,19 @@ function startCronJobs(io) {
   console.log('[Cron] Starting all cron jobs...');
 
   // ── USGS Earthquakes every 5 minutes ──────────────
+  // M5 FIX: exclude India-bbox events — those are handled by NCS with finer detail.
   cron.schedule('*/5 * * * *', async () => {
-    console.log('[Cron] Polling USGS earthquakes...');
+    console.log('[Cron] Polling USGS earthquakes (global, ex-India)...');
     try {
       const events = await fetchEarthquakes(4.0, 2);
-      await upsertEvents(events, io, 'Earthquake');
+      // Filter out India-region events to prevent NCS/USGS dedup conflicts
+      const globalOnly = events.filter(e => {
+        const lat = e.location?.lat;
+        const lon = e.location?.lon;
+        return !isInIndia(lat, lon);
+      });
+      console.log(`[Cron] USGS: ${events.length} total, ${globalOnly.length} after India filter`);
+      await upsertEvents(globalOnly, io, 'Earthquake');
     } catch (e) {
       console.error('[Cron] USGS poll error:', e.message);
     }
@@ -182,6 +239,16 @@ function startCronJobs(io) {
     }
   });
 
+  // ── Cleanup Stale Events every hour ──
+  cron.schedule('0 * * * *', async () => {
+    console.log('[Cron] Running scheduled stale event cleanup...');
+    try {
+      await cleanupStaleEvents();
+    } catch (e) {
+      console.error('[Cron] Cleanup error:', e.message);
+    }
+  });
+
   // Run initial fetch immediately on startup
   setTimeout(async () => {
     console.log('[Cron] Running initial data fetch on startup...');
@@ -227,4 +294,4 @@ function startCronJobs(io) {
   // }
 }
 
-module.exports = { startCronJobs };
+module.exports = { startCronJobs, upsertEvents };

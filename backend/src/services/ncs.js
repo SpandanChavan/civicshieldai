@@ -116,4 +116,4 @@ async function fetchNCSEarthquakes(minMag = 3.0, dayRange = 2) {
   return events;
 }
 
-module.exports = { fetchNCSEarthquakes };
+module.exports = { fetchNCSEarthquakes, getSeismicZone };

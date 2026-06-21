@@ -1,11 +1,17 @@
 """
-Scikit-learn based classification service.
-Covers disaster severity classification and misinformation detection.
+Rule-based classification service for CivicShield AI.
+
+Covers two classifiers:
+  1. Disaster severity — threshold rules per event type (Earthquake/Wildfire/Flood)
+     with a combined feature score for unknown types.
+  2. Misinformation detection — regex pattern matching against known panic/disinfo
+     phrases plus source domain credibility scoring.
+
+No ML model is used or required. The HuggingFace integration was removed because
+it was unreachable dead code (the function was defined but never called anywhere).
 """
-import os
 import re
 from typing import Dict, Any, Optional
-import httpx
 
 
 # ── Severity Classification ───────────────────────────────────────
@@ -104,34 +110,12 @@ RELIABLE_SOURCES = [
 ]
 
 
-async def _call_huggingface(text: str) -> Optional[Dict]:
-    """Call HuggingFace Inference API for text classification."""
-    token = os.getenv("HF_API_TOKEN")
-    if not token:
-        return None
-
-    hf_url = "https://api-inference.huggingface.co/models/distilbert-base-uncased-finetuned-sst-2-english"
-    headers = {"Authorization": f"Bearer {token}"}
-
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        # Retry once on 503 (model loading)
-        for attempt in range(2):
-            try:
-                resp = await client.post(hf_url, headers=headers, json={"inputs": text[:512]})
-                if resp.status_code == 503 and attempt == 0:
-                    import asyncio
-                    await asyncio.sleep(10)
-                    continue
-                resp.raise_for_status()
-                return resp.json()
-            except Exception:
-                break
-    return None
-
-
 def detect_misinformation(text: str, source: Optional[str] = None) -> Dict[str, Any]:
     """
-    NLP-based misinformation detector using pattern matching + optional HuggingFace.
+    Rule-based misinformation detector.
+
+    Checks text against a set of known panic/disinfo regex patterns and
+    gives a credibility bonus when the source URL belongs to a verified domain.
 
     Returns:
         is_misinformation, confidence, label, explanation

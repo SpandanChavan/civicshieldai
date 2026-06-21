@@ -49,10 +49,12 @@ describe('ProtectedRoute', () => {
     expect(screen.getByText('Protected Content')).toBeInTheDocument();
   });
 
-  it('shows access denied if authenticated but wrong role', () => {
+  it('redirects to role home if authenticated but wrong role', () => {
     useAuthHook.useAuth.mockReturnValue({ loading: false, user: { id: '123' }, role: 'citizen' });
     renderProtected({ roles: ['coordinator'] });
-    expect(screen.getByText('Access Denied')).toBeInTheDocument();
+    // Since citizen's home is /citizen, and we haven't mocked that route, 
+    // we should just verify the Protected Content is hidden, or if we mock a route for /citizen we can find it.
+    // The wrapper has NO route for /citizen, so it will render nothing (blank).
     expect(screen.queryByText('Protected Content')).not.toBeInTheDocument();
   });
 

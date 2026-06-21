@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { BellRing } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 const CHANNELS = ['web_push', 'whatsapp', 'sms', 'email', 'telegram', 'multilingual'];
 const SEVERITIES = ['Low', 'Medium', 'High', 'Critical'];
 
 export default function AlertForm({ eventId, onSuccess, createAlert, isCreating }) {
+  const { profile } = useAuth();
   const [form, setForm] = useState({
     title: '',
     body: '',
@@ -59,6 +62,15 @@ export default function AlertForm({ eventId, onSuccess, createAlert, isCreating 
       className="space-y-4"
       aria-label="Create alert form"
     >
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-white">New Alert</h3>
+        {profile?.states && (
+          <span className="px-2 py-1 bg-brand-500/10 text-brand-400 text-[10px] uppercase font-bold tracking-wider rounded border border-brand-500/20">
+            📍 {profile.states.name}
+          </span>
+        )}
+      </div>
+
       <div>
         <label htmlFor="alert-title" className="block text-xs font-medium text-slate-400 mb-1">
           Alert Title *
@@ -199,7 +211,7 @@ export default function AlertForm({ eventId, onSuccess, createAlert, isCreating 
         {isCreating ? (
           <span className="flex items-center gap-2"><span className="spinner" /> Sending Alert…</span>
         ) : (
-          '🚨 Send Alert'
+          <span className="flex items-center gap-2"><BellRing size={16} /> Send Alert</span>
         )}
       </button>
     </form>

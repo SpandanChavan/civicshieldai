@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import useAppStore from '@/store/useAppStore';
+import { useTranslation } from '@/utils/i18n';
 import DisasterMap from '@/components/map/DisasterMap';
 import MapLayers from '@/components/map/MapLayers';
 import IMDLegend from '@/components/map/IMDLegend';
@@ -6,192 +8,164 @@ import AlertCard from '@/components/alerts/AlertCard';
 import NDRFPanel from '@/components/resources/NDRFPanel';
 import MonsoonDashboard from '@/components/dashboard/MonsoonDashboard';
 import MisinformationPanel from '@/components/dashboard/MisinformationPanel';
-import { useDisasterEvents } from '@/hooks/useDisasterEvents';
-import useAppStore from '@/store/useAppStore';
-import { useTranslation } from '@/utils/i18n';
+import {
+  AlertTriangle, Cloud, Truck, Search, Radio,
+  Layers, SlidersHorizontal, Globe, MapPin,
+  ZoomIn, ChevronLeft, ChevronRight, Maximize2,
+  LayoutGrid, Activity, Flame, Waves, Wind, Mountain,
+  Sun, ThermometerSun, Snowflake, Leaf, LocateFixed, Map
+} from 'lucide-react';
+
+/* ── Constants ─────────────────────────────────────── */
 
 const TABS = [
-  { key: 'events',    icon: '🚨', label: 'sidebar.alerts'    },
-  { key: 'monsoon',   icon: '🌧️', label: 'monsoon.active'    },
-  { key: 'ndrf',      icon: '🚒', label: 'ndrf.title'        },
-  { key: 'factcheck', icon: '🔍', label: 'Fact-Check'         },
+  { key: 'events',    icon: AlertTriangle, label: 'Alerts'     },
+  { key: 'monsoon',   icon: Cloud,         label: 'Monsoon'    },
+  { key: 'ndrf',      icon: Truck,         label: 'NDRF'       },
+  { key: 'factcheck', icon: Search,        label: 'Fact-Check' },
 ];
 
+const SEV_COLORS = {
+  Critical: '#ef4444', High: '#f97316', Medium: '#f59e0b', Low: '#3b82f6',
+};
+
+/* ── Styles ─────────────────────────────────────────── */
+const STYLES = `
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+  * { box-sizing: border-box; }
+
+  .pp-scroll::-webkit-scrollbar { width: 4px; }
+  .pp-scroll::-webkit-scrollbar-track { background: transparent; }
+  .pp-scroll::-webkit-scrollbar-thumb { background: rgba(0,166,147,0.25); border-radius: 4px; }
+  .pp-scroll { scrollbar-width: thin; scrollbar-color: rgba(0,166,147,0.25) transparent; }
+
+  .pp-type-btn { transition: all 0.15s; border: 1px solid transparent; cursor: pointer; }
+  .pp-type-btn:hover { background: rgba(0,166,147,0.08) !important; border-color: rgba(0,166,147,0.2) !important; }
+  .pp-type-btn.active { background: rgba(0,166,147,0.15) !important; border-color: rgba(0,166,147,0.35) !important; color: #00A693 !important; }
+
+  .pp-sev-btn { transition: all 0.15s; cursor: pointer; border: 1px solid transparent; }
+  .pp-sev-btn:hover { opacity: 0.9; }
+
+  .pp-tab-btn { transition: all 0.15s; cursor: pointer; }
+  .pp-tab-btn:hover { color: white !important; }
+
+  .pp-map-ctrl { transition: all 0.15s; cursor: pointer; }
+  .pp-map-ctrl:hover { background: rgba(0,166,147,0.12) !important; border-color: rgba(0,166,147,0.3) !important; color: #00A693 !important; }
+
+  .pp-toggle { accent-color: #00A693; }
+
+  @keyframes ppPingPulse { 0%, 100% { transform: scale(1); opacity: 0.6; } 50% { transform: scale(1.8); opacity: 0; } }
+  @keyframes ppGlow { 0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); } 50% { box-shadow: 0 0 0 8px rgba(239,68,68,0); } }
+`;
+
 export default function PublicPortal() {
-  const events      = useAppStore((s) => s.events);
-  const eventStats  = useAppStore((s) => s.eventStats);
-  const isConnected = useAppStore((s) => s.isConnected);
-  const { t }       = useTranslation();
-
+  const events          = useAppStore((s) => s.events);
   const [selectedEvent, setSelectedEvent] = useState(null);
-  const [sidebarOpen, setSidebarOpen]     = useState(true);
   const [activeTab, setActiveTab]         = useState('events');
+  const portalRightOpen = useAppStore((s) => s.portalRightOpen);
 
-  const setUserLocation = useAppStore((s) => s.setUserLocation);
-
-  // Ask for location on mount
-  useEffect(() => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setUserLocation({ lat: pos.coords.latitude, lon: pos.coords.longitude });
-        },
-        (err) => {
-          console.log('User denied location access or error occurred:', err.message);
-        }
-      );
-    }
-  }, [setUserLocation]);
-
-  useDisasterEvents();
-
-  const recentCritical = events.filter(e => e.severity === 'Critical').slice(0, 5);
-  const recentAll      = events.slice(0, 20);
+  const recentAll      = events.slice(0, 30);
 
   return (
-    <div className="flex h-[calc(100vh-56px)] relative overflow-hidden">
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 56px)', overflow: 'hidden', background: '#06131a', fontFamily: "'Inter', sans-serif" }}>
+      <style>{STYLES}</style>
 
-      {/* Map — full background */}
-      <div className="absolute inset-0">
-        <DisasterMap onEventSelect={setSelectedEvent} />
-      </div>
+      {/* ── MAIN LAYOUT ──────────────────────── */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
 
-      {/* Layer controls (PIN search, filters, zoom) — top-left */}
-      <MapLayers />
+        {/* ════ CENTER — MAP ════════════════════════════ */}
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden', minWidth: 0 }}>
+          <DisasterMap onEventSelect={setSelectedEvent} />
+          <MapLayers />
+          <div className="absolute bottom-4 left-4 z-[1000] pointer-events-auto">
+            <IMDLegend />
+          </div>
 
-      {/* 🌦️ IMD Legend — bottom-left */}
-      <div className="absolute bottom-4 left-4 z-[1000] pointer-events-auto">
-        <IMDLegend />
-      </div>
-
-      {/* Critical alert banner — top-center */}
-      {recentCritical.length > 0 && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[900] flex gap-2 max-w-xl w-full px-4">
-          <div className="glass border border-red-500/40 rounded-xl px-4 py-3 w-full animate-fade-in">
-            <div className="flex items-center gap-2">
-              <span className="text-red-400 text-lg animate-pulse">🚨</span>
-              <div>
-                <p className="text-xs font-bold text-red-400 uppercase tracking-wide">
-                  {t('severity.Critical')} Alert
-                </p>
-                <p className="text-sm text-white font-medium">{recentCritical[0].title}</p>
+          {/* Selected event popup — cleanly positioned inside map bounds */}
+          {selectedEvent && (
+            <div style={{ position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)', zIndex: 900, width: 340, padding: '16px 18px', borderRadius: 16, background: 'rgba(6,14,22,0.96)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 20px 60px rgba(0,0,0,0.7)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 9px', borderRadius: 999, textTransform: 'uppercase', letterSpacing: '0.06em',
+                  color: SEV_COLORS[selectedEvent.severity] || '#94a3b8',
+                  background: `${SEV_COLORS[selectedEvent.severity] || '#94a3b8'}18`,
+                  border: `1px solid ${SEV_COLORS[selectedEvent.severity] || '#94a3b8'}40`,
+                }}>
+                  {selectedEvent.severity}
+                </span>
+                <span style={{ fontSize: 10, color: '#334155', fontWeight: 600 }}>{selectedEvent.event_type}</span>
+                <button onClick={() => setSelectedEvent(null)} style={{ width: 24, height: 24, borderRadius: 7, background: 'rgba(255,255,255,0.06)', border: 'none', cursor: 'pointer', color: '#64748b', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+              </div>
+              <h3 style={{ fontSize: 14, fontWeight: 700, color: 'white', margin: '0 0 6px', lineHeight: 1.4 }}>{selectedEvent.title}</h3>
+              {selectedEvent.description && <p style={{ fontSize: 12, color: '#64748b', margin: '0 0 8px', lineHeight: 1.5 }}>{selectedEvent.description}</p>}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 11, color: '#1e293b' }}>Source: {selectedEvent.source}</span>
+                {selectedEvent.lat && <span style={{ fontSize: 10, color: '#1e293b' }}>{selectedEvent.lat?.toFixed(2)}, {selectedEvent.lon?.toFixed(2)}</span>}
               </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
 
-      {/* Right sidebar */}
-      <div
-        className={`absolute right-0 top-0 bottom-0 z-[800] flex flex-col transition-all duration-300 ${
-          sidebarOpen ? 'w-full sm:w-80' : 'w-0'
-        } overflow-hidden`}
-      >
-        <div className="glass border-l border-white/5 h-full flex flex-col w-full sm:w-80">
+        {/* ════ RIGHT PANEL — Alerts & Info ════════════ */}
+        <div style={{ width: portalRightOpen ? 300 : 0, flexShrink: 0, overflow: 'hidden', transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)', background: 'rgba(6,14,22,0.92)', backdropFilter: 'blur(20px)', borderLeft: '1px solid rgba(0,166,147,0.12)', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ width: 300, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: "'Inter', sans-serif" }}>
 
-          {/* Stats row */}
-          <div className="grid grid-cols-2 gap-2 p-3 pb-0">
-            <div className="glass-card text-center py-2.5">
-              <div className="text-2xl font-bold text-white">{eventStats.total || 0}</div>
-              <div className="text-xs text-slate-500">{t('sidebar.alerts')}</div>
-            </div>
-            <div className="glass-card text-center py-2.5">
-              <div className="text-2xl font-bold text-red-400">{eventStats.bySeverity?.Critical || 0}</div>
-              <div className="text-xs text-slate-500">{t('severity.Critical')}</div>
-            </div>
-          </div>
-
-          {/* Tab nav */}
-          <div className="flex border-b border-white/5 mt-3 mx-3 rounded-xl overflow-hidden">
-            {TABS.map((tab) => (
-              <button
-                key={tab.key}
-                id={`portal-tab-${tab.key}`}
-                onClick={() => setActiveTab(tab.key)}
-                className={`flex-1 py-2 text-xs font-semibold transition-all duration-200 flex items-center justify-center gap-1 ${
-                  activeTab === tab.key
-                    ? 'bg-brand-600/30 text-brand-300 border border-brand-500/20 rounded-xl'
-                    : 'text-slate-500 hover:text-white'
-                }`}
-              >
-                {tab.icon}
-              </button>
-            ))}
-          </div>
-
-          {/* Tab label */}
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider px-4 pt-2 pb-1">
-            {t(TABS.find(t => t.key === activeTab)?.label || '')}
-          </p>
-
-          {/* Tab content */}
-          <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-2">
-
-            {/* Events tab */}
-            {activeTab === 'events' && (
-              <>
-                <div className="flex items-center justify-between mb-1">
-                  <span className={`text-xs ${isConnected ? 'text-emerald-400' : 'text-slate-500'}`}>
-                    {isConnected ? `● ${t('nav.live')}` : `○ ${t('nav.offline')}`}
-                  </span>
+            {/* Panel header */}
+            <div style={{ padding: '14px 14px 0', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                  <Radio size={14} color="#00A693" />
+                  <span style={{ fontSize: 13, fontWeight: 800, color: 'white' }}>Intelligence Feed</span>
                 </div>
-                {recentAll.length === 0 ? (
-                  <div className="text-center py-8 text-slate-500">
-                    <div className="text-3xl mb-2">📡</div>
-                    <p className="text-sm">{t('sidebar.loading')}</p>
-                  </div>
-                ) : (
-                  recentAll.map(event => (
-                    <AlertCard key={event.id} event={event} onClick={setSelectedEvent} />
-                  ))
-                )}
-              </>
-            )}
+                <span style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 999, background: 'rgba(0,166,147,0.12)', border: '1px solid rgba(0,166,147,0.25)', color: '#00A693' }}>
+                  {recentAll.length} events
+                </span>
+              </div>
 
-            {/* Monsoon tab */}
-            {activeTab === 'monsoon' && <MonsoonDashboard />}
+              {/* Tab nav */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3, padding: '3px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)', marginBottom: 12 }}>
+                {TABS.map(tab => {
+                  const IconComp = tab.icon;
+                  const isActive = activeTab === tab.key;
+                  return (
+                    <button key={tab.key} id={`portal-tab-${tab.key}`} onClick={() => setActiveTab(tab.key)}
+                      className="pp-tab-btn"
+                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '6px 2px', borderRadius: 7, border: 'none', background: isActive ? '#00A693' : 'transparent', color: isActive ? 'white' : '#475569', transition: 'all 0.15s', boxShadow: isActive ? '0 2px 10px rgba(0,166,147,0.35)' : 'none' }}>
+                      <IconComp size={12} />
+                      <span style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-            {/* NDRF tab */}
-            {activeTab === 'ndrf' && <NDRFPanel />}
+            {/* Scrollable tab content */}
+            <div className="pp-scroll" style={{ flex: 1, overflowY: 'auto', padding: '0 10px 12px' }}>
 
-            {/* Fact-Check tab */}
-            {activeTab === 'factcheck' && <MisinformationPanel />}
+              {/* Events tab */}
+              {activeTab === 'events' && (
+                <>
+                  {recentAll.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '48px 0' }}>
+                      <Radio size={32} color="#1e293b" style={{ margin: '0 auto 12px' }} />
+                      <p style={{ fontSize: 13, color: '#334155' }}>Loading live events…</p>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      {recentAll.map(event => (
+                        <AlertCard key={event.id} event={event} onClick={setSelectedEvent} />
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {activeTab === 'monsoon'   && <MonsoonDashboard />}
+              {activeTab === 'ndrf'      && <NDRFPanel />}
+              {activeTab === 'factcheck' && <MisinformationPanel />}
+            </div>
           </div>
         </div>
       </div>
-
-      {/* Sidebar toggle */}
-      <button
-        id="sidebar-toggle"
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="absolute right-0 top-1/2 -translate-y-1/2 z-[900] glass border border-white/10 rounded-l-xl px-2 py-4 text-slate-400 hover:text-white transition-colors"
-        aria-label="Toggle event sidebar"
-      >
-        {sidebarOpen ? '›' : '‹'}
-      </button>
-
-      {/* Selected event detail */}
-      {selectedEvent && (
-        <div className="absolute bottom-4 left-4 z-[900] glass border border-white/10 rounded-xl p-4 max-w-sm w-full animate-slide-up ml-0"
-          style={{ left: '220px' }}
-        >
-          <div className="flex justify-between items-start mb-2">
-            <span className={`severity-${selectedEvent.severity?.toLowerCase()}`}>
-              {t(`severity.${selectedEvent.severity}`) || selectedEvent.severity}
-            </span>
-            <button
-              onClick={() => setSelectedEvent(null)}
-              className="text-slate-400 hover:text-white text-lg leading-none"
-              aria-label="Close event detail"
-            >✕</button>
-          </div>
-          <h3 className="text-sm font-bold text-white mb-1">{selectedEvent.title}</h3>
-          {selectedEvent.description && (
-            <p className="text-xs text-slate-400">{selectedEvent.description}</p>
-          )}
-          <p className="text-xs text-slate-600 mt-2">Source: {selectedEvent.source}</p>
-        </div>
-      )}
     </div>
   );
 }

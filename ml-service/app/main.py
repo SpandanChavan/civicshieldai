@@ -15,9 +15,15 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+# M3 FIX: restrict CORS to an explicit allow-list from ALLOWED_ORIGINS env var.
+# Wildcard ("*") + allow_credentials=True is rejected by browsers — it's also
+# a security hole. Default to localhost dev ports when the env var is not set.
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173")
+ALLOWED_ORIGINS = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

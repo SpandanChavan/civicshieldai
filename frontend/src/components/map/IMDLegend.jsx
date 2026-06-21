@@ -1,4 +1,5 @@
 import { useTranslation } from '@/utils/i18n';
+import { CloudLightning } from 'lucide-react';
 
 /**
  * IMDLegend — Shows IMD's official 4-colour warning system on the map.
@@ -62,7 +63,7 @@ export default function IMDLegend() {
     >
       {/* Header */}
       <div className="flex items-center gap-2 mb-2.5 pb-2 border-b border-white/10">
-        <span className="text-base">🌦️</span>
+        <CloudLightning size={16} className="text-slate-300" />
         <span className="text-xs font-bold text-slate-200 uppercase tracking-wider">
           {t('map.legend')}
         </span>

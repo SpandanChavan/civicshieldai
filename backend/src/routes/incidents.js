@@ -1,13 +1,9 @@
 const express = require('express');
-const { createClient } = require('@supabase/supabase-js');
 const { z } = require('zod');
 const rateLimit = require('express-rate-limit');
 const { logAudit } = require('../utils/auditLogger');
+const { getAdminDb: getDb } = require('../lib/db');
 const router = express.Router();
-
-function getDb() {
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-}
 
 const IncidentSchema = z.object({
   description: z.string().min(10).max(2000),
@@ -17,10 +13,14 @@ const IncidentSchema = z.object({
   }),
   media_urls: z.array(z.string().url()).optional().default([]),
   event_id: z.string().uuid().optional(),
-  reporter_id: z.string().uuid().optional(),
+  reporter_name: z.string().optional(),
+  reporter_contact: z.string().optional(),
 });
 
 // ── GET /api/incidents ────────────────────────────────
+// Coordinators see their state's pending reports
+// Citizens see only their own reports (filtered by reporter_id = userId)
+// Admins see everything
 router.get('/', async (req, res) => {
   try {
     const { status, limit = 100, offset = 0 } = req.query;
@@ -32,9 +32,38 @@ router.get('/', async (req, res) => {
 
     if (status) query = query.eq('status', status);
 
+    if (req.userRole === 'coordinator' && req.userStateId) {
+      // Coordinator sees all reports in their state
+      query = query.eq('state_id', req.userStateId);
+    } else if (req.userRole === 'citizen' && req.userId) {
+      // Citizens see only their own reports
+      query = query.eq('reporter_id', req.userId);
+    }
+    // admin: no additional filter — sees everything
+
     const { data, error } = await query;
     if (error) throw error;
     res.json({ data });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── GET /api/incidents/pending ────────────────────────
+// Coordinator-only: pending reports awaiting review in their state
+router.get('/pending', async (req, res) => {
+  if (req.userRole !== 'coordinator' || !req.userStateId) {
+    return res.status(403).json({ error: 'Coordinators only' });
+  }
+  try {
+    const { data, error } = await getDb()
+      .from('incident_reports')
+      .select('*')
+      .eq('state_id', req.userStateId)
+      .in('status', ['pending_review', 'under_review'])
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    res.json({ data, count: data.length });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -58,9 +87,9 @@ router.get('/:id', async (req, res) => {
 
 // ── POST /api/incidents ───────────────────────────────
 const incidentLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000, // 10 minutes
-  max: 5, // max 5 incidents per IP
-  message: { error: 'Too many incident reports created from this IP, please try again after 10 minutes.' }
+  windowMs: 10 * 60 * 1000,
+  max: 5,
+  message: { error: 'Too many incident reports. Please try again after 10 minutes.' }
 });
 
 router.post('/', incidentLimiter, async (req, res) => {
@@ -69,24 +98,44 @@ router.post('/', incidentLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
   }
 
+  // Only authenticated citizens or coordinators can submit
+  if (!req.userId) {
+    return res.status(401).json({ error: 'Authentication required to submit a report' });
+  }
+
   const { location, ...rest } = parsed.data;
+  let finalStateId = null;
+
+  // Geocode location → state
+  try {
+    const { data: stateId } = await getDb().rpc('get_state_from_point', {
+      lat: location.lat,
+      lon: location.lon,
+    });
+    if (stateId) finalStateId = stateId;
+  } catch (err) {
+    console.error('[Incidents] Geocoding error:', err.message);
+  }
+
   try {
     const { data, error } = await getDb()
       .from('incident_reports')
       .insert({
         ...rest,
+        reporter_id: req.userId,
+        state_id: finalStateId,
         location: `SRID=4326;POINT(${location.lon} ${location.lat})`,
-        status: 'pending',
+        status: 'pending_review',
       })
       .select()
       .single();
     if (error) throw error;
-    
-    // Log audit action asynchronously
-    logAudit('INCIDENT_REPORTED', parsed.data.reporter_id || null, data.id, { 
-      status: 'pending',
+
+    logAudit('INCIDENT_REPORTED', req.userId, data.id, {
+      status: 'pending_review',
       lat: location.lat,
-      lon: location.lon
+      lon: location.lon,
+      state_id: finalStateId,
     });
 
     res.status(201).json({ data });
@@ -95,21 +144,85 @@ router.post('/', incidentLimiter, async (req, res) => {
   }
 });
 
-// ── PATCH /api/incidents/:id/status ──────────────────
+// ── PATCH /api/incidents/:id/approve ─────────────────
+// Coordinator approves a report. Optionally creates an official alert.
+router.patch('/:id/approve', async (req, res) => {
+  if (req.userRole !== 'coordinator' && req.userRole !== 'admin') {
+    return res.status(403).json({ error: 'Coordinators only' });
+  }
+  try {
+    const { data, error } = await getDb()
+      .from('incident_reports')
+      .update({
+        status: 'approved',
+        reviewer_id: req.userId,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq('id', req.params.id)
+      .select()
+      .single();
+    if (error) throw error;
+
+    logAudit('INCIDENT_APPROVED', req.userId, req.params.id, { state_id: req.userStateId });
+    res.json({ data, message: 'Report approved' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── PATCH /api/incidents/:id/reject ──────────────────
+router.patch('/:id/reject', async (req, res) => {
+  if (req.userRole !== 'coordinator' && req.userRole !== 'admin') {
+    return res.status(403).json({ error: 'Coordinators only' });
+  }
+  const { reason } = req.body;
+  if (!reason || reason.trim().length < 5) {
+    return res.status(400).json({ error: 'A rejection reason of at least 5 characters is required' });
+  }
+  try {
+    const { data, error } = await getDb()
+      .from('incident_reports')
+      .update({
+        status: 'rejected',
+        reviewer_id: req.userId,
+        rejection_reason: reason,
+        reviewed_at: new Date().toISOString(),
+      })
+      .eq('id', req.params.id)
+      .select()
+      .single();
+    if (error) throw error;
+
+    logAudit('INCIDENT_REJECTED', req.userId, req.params.id, { reason });
+    res.json({ data, message: 'Report rejected' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ── PATCH /api/incidents/:id/status (legacy) ──────────
+// B8 FIX: require coordinator or admin role
 router.patch('/:id/status', async (req, res) => {
+  if (!req.userId) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+  if (req.userRole !== 'coordinator' && req.userRole !== 'admin') {
+    return res.status(403).json({ error: 'Forbidden: Coordinators and admins only' });
+  }
   const { status } = req.body;
-  const VALID = ['pending', 'verified', 'rejected', 'resolved'];
+  const VALID = ['pending_review', 'under_review', 'approved', 'rejected', 'resolved'];
   if (!VALID.includes(status)) {
     return res.status(400).json({ error: `Invalid status. Must be one of: ${VALID.join(', ')}` });
   }
   try {
     const { data, error } = await getDb()
       .from('incident_reports')
-      .update({ status })
+      .update({ status, reviewed_at: new Date().toISOString(), reviewer_id: req.userId })
       .eq('id', req.params.id)
       .select()
       .single();
     if (error) throw error;
+    logAudit('INCIDENT_STATUS_CHANGED', req.userId, req.params.id, { status });
     res.json({ data });
   } catch (e) {
     res.status(500).json({ error: e.message });

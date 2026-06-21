@@ -158,16 +158,13 @@ async function fetchFloodListIndia() {
     const coords = matchedState ? STATE_COORDS[matchedState] : [22.5937, 78.9629];
     const [lat, lon] = coords || [22.5937, 78.9629];
 
-    // Add small random jitter so overlapping events don't stack
-    const jLat = lat + (Math.random() - 0.5) * 0.5;
-    const jLon = lon + (Math.random() - 0.5) * 0.5;
-
+    // m4 FIX: use exact state centroid — jitter was causing dedup violations and map flicker
     events.push({
       title: title.replace(/&#\d+;/g, '').trim(),
       description: description.slice(0, 400),
       event_type: 'Flood',
       severity: 'High',
-      location: { lat: jLat, lon: jLon },   // apiPollers formats as WKT
+      location: { lat, lon },   // apiPollers formats as WKT
       source: 'FloodList',
       dedup_hash: dedupHash,
       is_active: true,
