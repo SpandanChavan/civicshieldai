@@ -26,7 +26,7 @@ function toRad(deg) { return (deg * Math.PI) / 180; }
  */
 export function parseWktPoint(wkt) {
   if (!wkt) return null;
-  const match = wkt.match(/POINT\(([^\s]+)\s+([^\)]+)\)/i);
+  const match = wkt.match(/POINT\(([^\s]+)\s+([^)]+)\)/i);
   if (!match) return null;
   return { lon: parseFloat(match[1]), lat: parseFloat(match[2]) };
 }
