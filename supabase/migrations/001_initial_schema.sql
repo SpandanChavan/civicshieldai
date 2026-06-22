@@ -135,7 +135,7 @@ CREATE POLICY "Auth users submit reports" ON incident_reports
 
 -- Auth users: read own incident reports
 CREATE POLICY "Auth users read own reports" ON incident_reports
-  FOR SELECT USING (reporter_id = auth.uid());
+  FOR SELECT USING (false);
 
 -- Service role: full access to all tables (backend uses service_role key)
 -- This is automatically granted to service_role by Supabase RLS bypass
