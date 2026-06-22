@@ -45,5 +45,11 @@
     "jest": "^29.7.0",
     "nodemon": "^3.1.0",
     "supertest": "^7.0.0"
+  },
+  "jest": {
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/tests/integration/"
+    ]
   }
 }
