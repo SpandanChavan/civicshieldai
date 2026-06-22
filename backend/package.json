@@ -17,7 +17,7 @@
   "dependencies": {
     "@sentry/node": "^10.57.0",
     "@sentry/profiling-node": "^10.57.0",
-    "@supabase/supabase-js": "^2.43.4",
+    "@supabase/supabase-js": "2.43.4",
     "@upstash/redis": "^1.28.4",
     "axios": "^1.6.8",
     "axios-retry": "^4.5.0",
