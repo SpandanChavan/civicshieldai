@@ -13,6 +13,7 @@
  * Both are created once and reused across the process lifetime.
  */
 const { createClient } = require('@supabase/supabase-js');
+if (!global.WebSocket) global.WebSocket = require('ws');
 
 let _adminDb = null;
 let _anonDb  = null;
