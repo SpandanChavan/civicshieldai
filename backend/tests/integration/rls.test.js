@@ -1,4 +1,5 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
+global.WebSocket = require('ws');
 const { getAdminDb, getAnonDb } = require('../../src/lib/db');
 const { createClient } = require('@supabase/supabase-js');
 
