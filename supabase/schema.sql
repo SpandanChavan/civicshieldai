@@ -35,8 +35,7 @@ CREATE TABLE IF NOT EXISTS public.states (
   bbox_south  DECIMAL(10,7),
   bbox_east   DECIMAL(10,7),
   bbox_west   DECIMAL(10,7),
-  created_at  TIMESTAMPTZ  DEFAULT NOW(),
-  drift_test  TEXT
+  created_at  TIMESTAMPTZ  DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS idx_states_code ON public.states (code);
 
@@ -82,22 +81,23 @@ ON CONFLICT (code) DO NOTHING;
 -- ============================================================================
 -- FUNCTION: get_state_from_point(lat, lon) → state UUID (smallest bbox match)
 -- ============================================================================
-CREATE OR REPLACE FUNCTION public.get_state_from_point(lat FLOAT, lon FLOAT)
-RETURNS UUID
-LANGUAGE plpgsql STABLE SECURITY DEFINER
-AS $$
-DECLARE matched_id UUID;
+CREATE OR REPLACE FUNCTION public.get_state_from_point(lat DOUBLE PRECISION, lon DOUBLE PRECISION)
+RETURNS UUID AS $$
+DECLARE
+  matched_id UUID;
 BEGIN
   SELECT id INTO matched_id
   FROM public.states
   WHERE lat BETWEEN bbox_south AND bbox_north
     AND lon BETWEEN bbox_west  AND bbox_east
-  ORDER BY (bbox_north - bbox_south) * (bbox_east - bbox_west) ASC
+  ORDER BY
+    (bbox_north - bbox_south) * (bbox_east - bbox_west) ASC
   LIMIT 1;
-  RETURN matched_id;
+
+  RETURN matched_id;  -- NULL if point is outside all state bboxes
 END;
-$$;
-GRANT EXECUTE ON FUNCTION public.get_state_from_point(FLOAT, FLOAT) TO anon, authenticated, service_role;
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+GRANT EXECUTE ON FUNCTION public.get_state_from_point(DOUBLE PRECISION, DOUBLE PRECISION) TO anon, authenticated, service_role;
 
 -- ============================================================================
 -- TABLE: events
@@ -116,8 +116,8 @@ CREATE TABLE IF NOT EXISTS public.events (
   updated_at  TIMESTAMPTZ  DEFAULT NOW(),
   is_active   BOOLEAN      DEFAULT true,
   dedup_hash  VARCHAR(64)  UNIQUE,
-  state_id    UUID         REFERENCES public.states(id)   ON DELETE SET NULL,
   created_by  UUID         REFERENCES auth.users(id)      ON DELETE SET NULL,
+  state_id    UUID         REFERENCES public.states(id)   ON DELETE SET NULL,
   alerted_at  TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS idx_events_location  ON public.events USING GIST (location);
@@ -189,19 +189,20 @@ CREATE TABLE IF NOT EXISTS public.incident_reports (
                      CHECK (status IN ('pending_review','under_review','approved','rejected','resolved')),
   event_id         UUID         REFERENCES public.events(id) ON DELETE SET NULL,
   created_at       TIMESTAMPTZ  DEFAULT NOW(),
-  state_id         UUID         REFERENCES public.states(id) ON DELETE SET NULL,
-  reviewer_id      UUID         REFERENCES auth.users(id)    ON DELETE SET NULL,
-  reviewed_at      TIMESTAMPTZ,
-  rejection_reason TEXT,
   category         VARCHAR(50)  CHECK (category IN (
                      'flood','fire','earthquake_damage','missing_person','road_blockage',
                      'medical_emergency','infrastructure_damage','landslide','cyclone','heatwave','other')),
-  title            VARCHAR(200)
+  title            VARCHAR(200),
+  state_id         UUID         REFERENCES public.states(id) ON DELETE SET NULL,
+  reviewer_id      UUID         REFERENCES auth.users(id)    ON DELETE SET NULL,
+  reviewed_at      TIMESTAMPTZ,
+  rejection_reason TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_reports_location ON public.incident_reports USING GIST (location);
 CREATE INDEX IF NOT EXISTS idx_reports_status   ON public.incident_reports (status, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_reports_state    ON public.incident_reports (state_id);
 CREATE INDEX IF NOT EXISTS idx_reports_category ON public.incident_reports (category, status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reports_reviewer ON public.incident_reports USING btree (reviewer_id);
 
 -- ============================================================================
 -- TABLE: alert_logs
@@ -225,10 +226,10 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
   id          UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   role        VARCHAR(20) DEFAULT 'citizen' CHECK (role IN ('citizen','coordinator','responder','admin')),
   full_name   TEXT,
-  state_id    UUID REFERENCES public.states(id) ON DELETE SET NULL,
-  assigned_at TIMESTAMPTZ,
   created_at  TIMESTAMPTZ DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ DEFAULT NOW()
+  updated_at  TIMESTAMPTZ DEFAULT NOW(),
+  state_id    UUID REFERENCES public.states(id) ON DELETE SET NULL,
+  assigned_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS idx_user_profiles_state ON public.user_profiles (state_id);
 CREATE INDEX IF NOT EXISTS idx_user_profiles_role  ON public.user_profiles (role);
@@ -254,14 +255,15 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at   ON public.audit_logs (cre
 CREATE TABLE IF NOT EXISTS public.misinformation_checks (
   id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   input_text        TEXT        NOT NULL,
-  credibility_score INTEGER     NOT NULL CHECK (credibility_score BETWEEN 0 AND 100),
-  classification    TEXT        NOT NULL,
-  confidence        INTEGER     NOT NULL CHECK (confidence BETWEEN 0 AND 100),
+  credibility_score INTEGER     NOT NULL DEFAULT 50 CHECK (credibility_score BETWEEN 0 AND 100),
+  classification    TEXT        NOT NULL DEFAULT 'Suspicious',
+  confidence        INTEGER     NOT NULL DEFAULT 50 CHECK (confidence BETWEEN 0 AND 100),
   is_misinformation BOOLEAN     NOT NULL DEFAULT false,
   explanation       TEXT,
-  report_id         UUID        REFERENCES public.incident_reports(id) ON DELETE SET NULL,
-  analyzed_at       TIMESTAMPTZ DEFAULT NOW()
+  analyzed_at       TIMESTAMPTZ DEFAULT NOW(),
+  report_id         UUID        REFERENCES public.incident_reports(id) ON DELETE SET NULL
 );
+CREATE INDEX IF NOT EXISTS idx_misinfo_is_misinfo ON public.misinformation_checks USING btree (is_misinformation, analyzed_at DESC);
 CREATE INDEX IF NOT EXISTS idx_misinfo_report   ON public.misinformation_checks (report_id);
 CREATE INDEX IF NOT EXISTS idx_misinfo_analyzed ON public.misinformation_checks (analyzed_at DESC);
 
@@ -283,20 +285,27 @@ CREATE INDEX IF NOT EXISTS idx_push_user ON public.push_subscriptions (user_id);
 -- SIGNUP TRIGGER: create profile + audit log on new auth user
 -- ============================================================================
 CREATE OR REPLACE FUNCTION public.handle_new_user_unified()
-RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public
-AS $$
+RETURNS TRIGGER AS $$
 BEGIN
   INSERT INTO public.user_profiles (id, full_name, role)
-  VALUES (NEW.id, NEW.raw_user_meta_data->>'full_name',
-          COALESCE(NEW.raw_user_meta_data->>'role', 'citizen'))
-  ON CONFLICT (id) DO NOTHING;
+  VALUES (
+    NEW.id,
+    NEW.raw_user_meta_data->>'full_name',
+    COALESCE(NEW.raw_user_meta_data->>'role', 'citizen')
+  )
+  ON CONFLICT (id) DO NOTHING;  -- idempotent if row somehow exists
 
   INSERT INTO public.audit_logs (user_id, action_type, metadata)
-  VALUES (NEW.id, 'USER_SIGNUP', jsonb_build_object('email', NEW.email));
+  VALUES (
+    NEW.id,
+    'USER_SIGNUP',
+    jsonb_build_object('email', NEW.email)
+  );
 
   RETURN NEW;
 END;
-$$;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
