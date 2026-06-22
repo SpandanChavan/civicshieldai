@@ -332,6 +332,8 @@ DO $$ BEGIN CREATE POLICY "Service role manages states"    ON public.states    F
 DO $$ BEGIN CREATE POLICY "Service role full access to user_profiles"         ON public.user_profiles         FOR ALL USING (auth.role() = 'service_role'); EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN CREATE POLICY "Service Role full access to audit_logs"            ON public.audit_logs            FOR ALL USING (auth.role() = 'service_role'); EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN CREATE POLICY "Service role full access to misinformation_checks" ON public.misinformation_checks FOR ALL USING (auth.role() = 'service_role'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Service Role full access to alert_logs"            ON public.alert_logs            FOR ALL USING (auth.role() = 'service_role'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Service role full access to incident_reports"      ON public.incident_reports      FOR ALL USING (auth.role() = 'service_role'); EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 -- Coordinators / admins manage operational data
 DO $$ BEGIN CREATE POLICY "Coordinators manage events"    ON public.events    FOR ALL USING (EXISTS (SELECT 1 FROM public.user_profiles WHERE id = auth.uid() AND role IN ('coordinator','admin'))); EXCEPTION WHEN duplicate_object THEN null; END $$;
@@ -340,7 +342,7 @@ DO $$ BEGIN CREATE POLICY "Coordinators manage resources" ON public.resources FO
 
 -- incident_reports: submit (auth), read own, responders/coordinators read, coordinators update
 DO $$ BEGIN CREATE POLICY "Auth users submit reports"   ON public.incident_reports FOR INSERT WITH CHECK (auth.role() = 'authenticated'); EXCEPTION WHEN duplicate_object THEN null; END $$;
-DO $$ BEGIN CREATE POLICY "Auth users read own reports" ON public.incident_reports FOR SELECT USING (reporter_id = auth.uid());            EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Auth users read own reports" ON public.incident_reports FOR SELECT USING (reporter_id = auth.uid()); EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN CREATE POLICY "Responders read all reports" ON public.incident_reports FOR SELECT USING (EXISTS (SELECT 1 FROM public.user_profiles WHERE id = auth.uid() AND role IN ('coordinator','responder','admin'))); EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN CREATE POLICY "Coordinators update reports"  ON public.incident_reports FOR UPDATE USING (EXISTS (SELECT 1 FROM public.user_profiles WHERE id = auth.uid() AND role IN ('coordinator','admin'))); EXCEPTION WHEN duplicate_object THEN null; END $$;
 
@@ -353,7 +355,7 @@ DO $$ BEGIN CREATE POLICY "Coordinators read misinformation checks" ON public.mi
 
 -- push_subscriptions
 DO $$ BEGIN CREATE POLICY "Users manage own push subscriptions"     ON public.push_subscriptions FOR ALL    USING (user_id = auth.uid());           EXCEPTION WHEN duplicate_object THEN null; END $$;
-DO $$ BEGIN CREATE POLICY "Service role reads all push subscriptions" ON public.push_subscriptions FOR SELECT USING (auth.role() = 'service_role'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Service role manages push subscriptions" ON public.push_subscriptions FOR ALL USING (auth.role() = 'service_role'); EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 -- ============================================================================
 -- REALTIME
@@ -370,3 +372,12 @@ END $$;
 --   SELECT get_state_from_point(28.61, 77.20);   -- expect Delhi UUID
 --   SELECT get_state_from_point(0, 0);           -- expect NULL
 -- ============================================================================
+
+GRANT USAGE ON SCHEMA public TO postgres, anon, authenticated, service_role;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO postgres, service_role;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO postgres, service_role;
+GRANT ALL PRIVILEGES ON ALL ROUTINES IN SCHEMA public TO postgres, service_role;
+
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;

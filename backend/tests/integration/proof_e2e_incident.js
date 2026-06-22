@@ -6,7 +6,9 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
   auth: { autoRefreshToken: false, persistSession: false }
 });
 
-const API_BASE = 'http://localhost:4000/api'; // Assuming local server is running on 4000
+const API_BASE = 'http://localhost:4000/api';
+
+const { app, httpServer } = require('../../src/app');
 
 async function ensureTestUser(email, password, role, stateId) {
   let { data: { users }, error: listErr } = await supabase.auth.admin.listUsers();
@@ -117,7 +119,12 @@ async function runProof() {
     console.log('--- End of Proof ---');
   } catch (e) {
     console.error('❌ Proof failed:', e.response?.data || e.message);
+    process.exitCode = 1;
+  } finally {
+    httpServer.close();
+    process.exit();
   }
 }
 
-runProof();
+// Wait for server to be ready before running
+setTimeout(runProof, 1000);
