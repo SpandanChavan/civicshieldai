@@ -63,6 +63,39 @@ jobs:
         env:
           NODE_ENV: test
 
+      - name: Schema drift guard (schema.sql vs migrations)
+        run: |
+          DOCKER_CMD="docker exec -i supabase_db_civicshield-ai"
+          # DB A: migrations were applied by `supabase start` on the default 'postgres' db
+          $DOCKER_CMD pg_dump --schema-only --no-owner --no-privileges -n public -U postgres -d postgres \
+            | grep -vE '^\s*--|^SET |^SELECT pg_catalog' | sort > /tmp/from_migrations.sql
+          
+          # DB B: fresh db, apply schema.sql
+          $DOCKER_CMD psql -U postgres -d postgres -c "DROP DATABASE IF EXISTS drift_check;" -c "CREATE DATABASE drift_check;"
+          
+          # Apply the auth stub
+          $DOCKER_CMD psql -U postgres -d drift_check -c "
+            CREATE SCHEMA IF NOT EXISTS auth;
+            CREATE TABLE IF NOT EXISTS auth.users (id uuid PRIMARY KEY);
+            CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid AS \$\$ SELECT NULL::uuid \$\$ LANGUAGE sql;
+            CREATE OR REPLACE FUNCTION auth.role() RETURNS text AS \$\$ SELECT NULL::text \$\$ LANGUAGE sql;
+            CREATE EXTENSION IF NOT EXISTS postgis;
+          "
+          
+          # Apply schema.sql
+          $DOCKER_CMD psql -U postgres -d drift_check < ../supabase/schema.sql
+          
+          # Dump DB B
+          $DOCKER_CMD pg_dump --schema-only --no-owner --no-privileges -n public -U postgres -d drift_check \
+            | grep -vE '^\s*--|^SET |^SELECT pg_catalog' | sort > /tmp/from_schema_sql.sql
+          
+          # Diff them semantically
+          if ! diff -u /tmp/from_migrations.sql /tmp/from_schema_sql.sql; then
+            echo "::error::supabase/schema.sql has drifted from supabase/migrations/. Regenerate or reconcile."
+            exit 1
+          fi
+          echo "✅ schema.sql matches migrations"
+
   frontend:
     name: Frontend (lint + build + test)
     runs-on: ubuntu-latest

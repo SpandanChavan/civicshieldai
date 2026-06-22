@@ -65,11 +65,17 @@ Deliverables: `CODE_REVIEW_FIXES.md`, and later `CODE_REVIEW_ROUND2.md`.
 - Code: `notificationRouter.js`, `resources.js`, `apiPollers.js`, `app.js`, `pushService.js`, `lib/db.js`, `.github/workflows/ci.yml`
 - Tests: `backend/tests/integration/rls.test.js` (+ smoke/socket tests)
 
+## 9. Phase 1.1 (RLS audit) + Phase 1.3 (CI integration tests) — COMPLETE
+- **P1-1 RLS audit:** role×table matrix (`docs/rls_matrix.md`); `008_rls_audit_fixes.sql` with least-privilege grants (closed a `GRANT ALL TO anon` TRUNCATE-bypasses-RLS hole found mid-review); `user_profiles` global-read finding documented/accepted.
+- **P1-3 CI integration tests:** CI now spins up a local Supabase stack (`supabase start`, committed `config.toml`, `major_version=17`) and runs `rls.test.js` + `smoke_test.js` + `proof_e2e_incident.js` on every PR — isolated, no prod contact, no secrets.
+- **Gate proven real:** a deliberate `USING (false)` RLS break turned the suite red on the exact citizen-own-report assertion; correct code is green. The process also caught and fixed (a) an earlier **false green** — tests were silently crashing on a Node-20 WebSocket polyfill gap before any assertion ran, and (b) a **test-setup bug** — a hardcoded `state_id` that FK-failed because `states.id` regenerates each db reset.
+- **Determinism/cleanup:** pinned `@supabase/supabase-js` + committed `package-lock.json`; removed duplicate workflows in favor of one `ci.yml`; jest configured to ignore `tests/integration/`; leftover scratch files removed; `.env` restored to hosted.
+- **Security note:** a credential-exposure incident occurred earlier in the session (engineer extracted/hardcoded the GitHub token) — token revoked, standing rule set (agent never handles credentials).
+
 ## Scorecard movement
-Overall **5.5 → ~6.0** (and rising with P1-1). Lowest remaining: testing depth, observability, ML validation.
+Overall **5.5 → 6.0 → 6.5**. Biggest gains: Testing/QA (3.0 → 6.5) and Deploy-readiness (3.5 → 6.0). Lowest remaining: observability (4.0), ML validation (5.0), frontend tests (6.0).
 
 ## Open items / next
-1. **Don't enable Supabase auto-deploy** until migration history is verified/repaired on the hosted DB.
-2. Finish P1-1 cleanup (remove leftover scratch files: `check_pol.js`, `check_pol2.js`, `test_pol.sql`, `backend/tests/integration/test_inc.js`; restore `backend/.env` to hosted).
-3. **P1-3 next:** wire `rls.test.js` + smoke/incident tests into CI against a test DB; prove red-on-break.
-4. Then P1-2 (frontend tests), P1-4 (validation sweep), P1-5 (observability), P1-6 (drift guard).
+1. **P1-6 — schema drift guard (NEXT)** — `schema.sql` is still validated by nothing; generate-from-migrations-and-diff using the new Supabase-in-CI stack. Ticket: `TICKET_P1-6_schema_drift_guard.md`.
+2. **Apply migration 008 to production safely** — repair migration history first so the integration doesn't re-run `001`; keep Supabase auto-deploy OFF until then.
+3. **P1-2** frontend tests · **P1-4** validation sweep · **P1-5** observability · ML validation · backups/DR.

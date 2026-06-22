@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS public.states (
   bbox_south  DECIMAL(10,7),
   bbox_east   DECIMAL(10,7),
   bbox_west   DECIMAL(10,7),
-  created_at  TIMESTAMPTZ  DEFAULT NOW()
+  created_at  TIMESTAMPTZ  DEFAULT NOW(),
+  drift_test  TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_states_code ON public.states (code);
 
