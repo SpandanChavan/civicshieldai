@@ -1,5 +1,6 @@
 require('dotenv').config({ path: require('path').resolve(__dirname, '../../.env') });
 const { createClient } = require('@supabase/supabase-js');
+if (!global.WebSocket) global.WebSocket = require('ws');
 
 const db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 

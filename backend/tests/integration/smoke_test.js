@@ -26,10 +26,14 @@ async function runSmokeTest() {
       email_confirm: true
     }));
 
-    await db.from('user_profiles').upsert([
-      { id: citizenAuth.user.id, role: 'citizen',      state_id: '6902dd5c-9bb2-4fd0-a242-bbca498c323c' },
-      { id: coordAuth.user.id,   role: 'coordinator',  state_id: '6902dd5c-9bb2-4fd0-a242-bbca498c323c' }
+    const { data: stateId, error: stateErr } = await db.rpc('get_state_from_point', { lat: 28.63, lon: 77.21 });
+    if (stateErr || !stateId) throw new Error('Failed to dynamically fetch state_id');
+
+    const { error: upsertErr } = await db.from('user_profiles').upsert([
+      { id: citizenAuth.user.id, role: 'citizen',      state_id: stateId },
+      { id: coordAuth.user.id,   role: 'coordinator',  state_id: stateId }
     ]);
+    if (upsertErr) throw upsertErr;
 
     const { data: citizenLogin } = await anonDb.auth.signInWithPassword({ email: `citizen${suffix}@smoke.test`, password: 'password123' });
     const { data: coordLogin }   = await anonDb.auth.signInWithPassword({ email: `coord${suffix}@smoke.test`,   password: 'password123' });
