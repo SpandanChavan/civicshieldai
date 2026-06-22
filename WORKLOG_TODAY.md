@@ -72,8 +72,13 @@ Deliverables: `CODE_REVIEW_FIXES.md`, and later `CODE_REVIEW_ROUND2.md`.
 - **Determinism/cleanup:** pinned `@supabase/supabase-js` + committed `package-lock.json`; removed duplicate workflows in favor of one `ci.yml`; jest configured to ignore `tests/integration/`; leftover scratch files removed; `.env` restored to hosted.
 - **Security note:** a credential-exposure incident occurred earlier in the session (engineer extracted/hardcoded the GitHub token) — token revoked, standing rule set (agent never handles credentials).
 
+## 10. Phase 1.6 (schema drift guard) — COMPLETE
+- CI now diffs `migrations/`-built vs `schema.sql`-built `public` schemas and fails on any drift (PG17 via docker exec, auth stub, postgis in extensions, `\restrict` stripped, exact statement match). Proven red on deliberate divergence, green at 1:1.
+- First run exposed real drift → `009_reconcile_schema_drift.sql`: fixed `incident_reports.status` default (`'pending'` violated CHECK → `'pending_review'`), dropped 3 stale trigger functions + 4 stale/over-permissive RLS policies, aligned `audit_logs.id`/`misinformation_checks` defaults + missing indexes.
+- Schema/code drift — the bug class that recurred all project — is now structurally un-mergeable.
+
 ## Scorecard movement
-Overall **5.5 → 6.0 → 6.5**. Biggest gains: Testing/QA (3.0 → 6.5) and Deploy-readiness (3.5 → 6.0). Lowest remaining: observability (4.0), ML validation (5.0), frontend tests (6.0).
+Overall **5.5 → 6.0 → 6.5 → 6.8**. Biggest gains: Testing/QA (3.0 → 7.0), Deploy-readiness (3.5 → 6.5), Database (6.5 → 8.0). Lowest remaining: observability (4.0), ML validation (5.0), frontend tests (6.0).
 
 ## Open items / next
 1. **P1-6 — schema drift guard (NEXT)** — `schema.sql` is still validated by nothing; generate-from-migrations-and-diff using the new Supabase-in-CI stack. Ticket: `TICKET_P1-6_schema_drift_guard.md`.

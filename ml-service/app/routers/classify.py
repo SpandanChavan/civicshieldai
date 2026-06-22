@@ -49,7 +49,7 @@ def classify_event_severity(req: SeverityRequest):
 def classify_misinformation(req: MisinfoRequest):
     """
     Detect misinformation in disaster-related text using NLP.
-    Uses keyword patterns + HuggingFace API (if configured).
+    Uses keyword patterns and logic to detect false reports.
     """
     try:
         return detect_misinformation(req.text, req.source)

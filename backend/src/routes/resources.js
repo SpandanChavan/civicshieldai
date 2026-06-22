@@ -115,7 +115,14 @@ router.patch('/:id', async (req, res) => {
 });
 
 // ── DELETE /api/resources/:id ─────────────────────────
+const DeleteResourceSchema = z.object({}).strict();
+
 router.delete('/:id', async (req, res) => {
+  const parsed = DeleteResourceSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
+
+  if (!req.userId) return res.status(401).json({ error: 'Authentication required' });
+  if (req.userRole !== 'coordinator' && req.userRole !== 'admin') return res.status(403).json({ error: 'Forbidden' });
   try {
     const { error } = await getDb().from('resources').delete().eq('id', req.params.id);
     if (error) throw error;

@@ -30,9 +30,13 @@ router.get('/coordinators', async (req, res) => {
 });
 
 // ── PATCH /api/admin/coordinators/:id ─────────────────
+const CoordPatchSchema = z.object({ state_id: z.string().uuid() });
+
 router.patch('/coordinators/:id', async (req, res) => {
   try {
-    const { state_id } = req.body;
+    const parsed = CoordPatchSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
+    const { state_id } = parsed.data;
     const { id } = req.params;
     const { data, error } = await getDb()
       .from('user_profiles')
@@ -141,9 +145,16 @@ router.get('/users', async (req, res) => {
 });
 
 // ── PATCH /api/admin/users/:id ────────────────────────
+const UserPatchSchema = z.object({
+  role: z.enum(['citizen', 'responder', 'coordinator', 'admin']).optional(),
+  state_id: z.string().uuid().nullable().optional()
+});
+
 router.patch('/users/:id', async (req, res) => {
   try {
-    const { role, state_id } = req.body;
+    const parsed = UserPatchSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
+    const { role, state_id } = parsed.data;
     const updates = {};
     if (role) updates.role = role;
     if (state_id !== undefined) updates.state_id = state_id;

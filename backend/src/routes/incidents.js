@@ -146,7 +146,14 @@ router.post('/', incidentLimiter, async (req, res) => {
 
 // ── PATCH /api/incidents/:id/approve ─────────────────
 // Coordinator approves a report. Optionally creates an official alert.
+const ApproveSchema = z.object({}).strict();
+
 router.patch('/:id/approve', async (req, res) => {
+  const parsed = ApproveSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
+  }
+
   if (req.userRole !== 'coordinator' && req.userRole !== 'admin') {
     return res.status(403).json({ error: 'Coordinators only' });
   }
@@ -171,14 +178,20 @@ router.patch('/:id/approve', async (req, res) => {
 });
 
 // ── PATCH /api/incidents/:id/reject ──────────────────
+const RejectSchema = z.object({
+  reason: z.string().min(5, "A rejection reason of at least 5 characters is required"),
+});
+
 router.patch('/:id/reject', async (req, res) => {
   if (req.userRole !== 'coordinator' && req.userRole !== 'admin') {
     return res.status(403).json({ error: 'Coordinators only' });
   }
-  const { reason } = req.body;
-  if (!reason || reason.trim().length < 5) {
-    return res.status(400).json({ error: 'A rejection reason of at least 5 characters is required' });
+  
+  const parsed = RejectSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
   }
+  const { reason } = parsed.data;
   try {
     const { data, error } = await getDb()
       .from('incident_reports')
@@ -202,6 +215,12 @@ router.patch('/:id/reject', async (req, res) => {
 
 // ── PATCH /api/incidents/:id/status (legacy) ──────────
 // B8 FIX: require coordinator or admin role
+const StatusSchema = z.object({
+  status: z.enum(['pending_review', 'under_review', 'approved', 'rejected', 'resolved'], {
+    errorMap: () => ({ message: "Invalid status. Must be one of: pending_review, under_review, approved, rejected, resolved" })
+  }),
+});
+
 router.patch('/:id/status', async (req, res) => {
   if (!req.userId) {
     return res.status(401).json({ error: 'Authentication required' });
@@ -209,11 +228,12 @@ router.patch('/:id/status', async (req, res) => {
   if (req.userRole !== 'coordinator' && req.userRole !== 'admin') {
     return res.status(403).json({ error: 'Forbidden: Coordinators and admins only' });
   }
-  const { status } = req.body;
-  const VALID = ['pending_review', 'under_review', 'approved', 'rejected', 'resolved'];
-  if (!VALID.includes(status)) {
-    return res.status(400).json({ error: `Invalid status. Must be one of: ${VALID.join(', ')}` });
+  
+  const parsed = StatusSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
   }
+  const { status } = parsed.data;
   try {
     const { data, error } = await getDb()
       .from('incident_reports')

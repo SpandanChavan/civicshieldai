@@ -14,22 +14,22 @@ This document maps out the exact access control matrix for all 10 core tables in
 
 | Table | Operation | anon | citizen | responder | coordinator | admin | service_role | Verified? |
 |-------|-----------|------|---------|-----------|-------------|-------|--------------|-----------|
-| **states** | `SELECT` | All | All | All | All | All | All | Yes |
-| | `INSERT` | Deny | Deny | Deny | Deny | Deny | All | Yes |
-| | `UPDATE` | Deny | Deny | Deny | Deny | Deny | All | Yes |
-| | `DELETE` | Deny | Deny | Deny | Deny | Deny | All | Yes |
-| **events** | `SELECT` | `is_active=true` | `is_active=true` | `is_active=true` | All | All | All | Yes |
-| | `INSERT` | Deny | Deny | Deny | All | All | All | Yes |
-| | `UPDATE` | Deny | Deny | Deny | All | All | All | Yes |
-| | `DELETE` | Deny | Deny | Deny | All | All | All | Yes |
-| **alerts** | `SELECT` | `status='sent'` | `status='sent'` | `status='sent'` | All | All | All | Yes |
-| | `INSERT` | Deny | Deny | Deny | All | All | All | Yes |
-| | `UPDATE` | Deny | Deny | Deny | All | All | All | Yes |
-| | `DELETE` | Deny | Deny | Deny | All | All | All | Yes |
-| **resources** | `SELECT` | All | All | All | All | All | All | Yes |
-| | `INSERT` | Deny | Deny | Deny | All | All | All | Yes |
-| | `UPDATE` | Deny | Deny | Deny | All | All | All | Yes |
-| | `DELETE` | Deny | Deny | Deny | All | All | All | Yes |
+| **states** | `SELECT` | All | All | All | All | All | All | Untested |
+| | `INSERT` | Deny | Deny | Deny | Deny | Deny | All | Untested |
+| | `UPDATE` | Deny | Deny | Deny | Deny | Deny | All | Untested |
+| | `DELETE` | Deny | Deny | Deny | Deny | Deny | All | Untested |
+| **events** | `SELECT` | `is_active=true` | `is_active=true` | `is_active=true` | All | All | All | Untested |
+| | `INSERT` | Deny | Deny | Deny | All | All | All | Untested |
+| | `UPDATE` | Deny | Deny | Deny | All | All | All | Untested |
+| | `DELETE` | Deny | Deny | Deny | All | All | All | Untested |
+| **alerts** | `SELECT` | `status='sent'` | `status='sent'` | `status='sent'` | All | All | All | Untested |
+| | `INSERT` | Deny | Deny | Deny | All | All | All | Untested |
+| | `UPDATE` | Deny | Deny | Deny | All | All | All | Untested |
+| | `DELETE` | Deny | Deny | Deny | All | All | All | Untested |
+| **resources** | `SELECT` | All | All | All | All | All | All | Untested |
+| | `INSERT` | Deny | Deny | Deny | All | All | All | Untested |
+| | `UPDATE` | Deny | Deny | Deny | All | All | All | Untested |
+| | `DELETE` | Deny | Deny | Deny | All | All | All | Untested |
 | **incident_reports** | `SELECT` | Deny | Own reports | All | All | All | All | Yes |
 | | `INSERT` | Deny | Own (Auth) | Own (Auth) | Own (Auth) | Own (Auth) | All | Yes |
 | | `UPDATE` | Deny | Deny | Deny | All | All | All | Yes |
@@ -38,10 +38,10 @@ This document maps out the exact access control matrix for all 10 core tables in
 | | `INSERT` | Deny | Deny | Deny | Deny | Deny | All | Yes |
 | | `UPDATE` | Deny | Deny | Deny | Deny | Deny | All | Yes |
 | | `DELETE` | Deny | Deny | Deny | Deny | Deny | All | Yes |
-| **user_profiles** | `SELECT` | Deny | All* | All* | All* | All* | All | Yes |
-| | `INSERT` | Deny | Triggers only | Triggers only| Triggers only| Triggers only| All | Yes |
-| | `UPDATE` | Deny | Own profile | Own profile | Own profile | Own profile | All | Yes |
-| | `DELETE` | Deny | Deny | Deny | Deny | Deny | All | Yes |
+| **user_profiles** | `SELECT` | Deny | All* | All* | All* | All* | All | Untested |
+| | `INSERT` | Deny | Triggers only | Triggers only| Triggers only| Triggers only| All | Untested |
+| | `UPDATE` | Deny | Own profile | Own profile | Own profile | Own profile | All | Untested |
+| | `DELETE` | Deny | Deny | Deny | Deny | Deny | All | Untested |
 | **audit_logs** | `SELECT` | Deny | Deny | Deny | Deny | Deny | All | Yes |
 | | `INSERT` | Deny | Deny | Deny | Deny | Deny | All | Yes |
 | | `UPDATE` | Deny | Deny | Deny | Deny | Deny | All | Yes |
@@ -50,10 +50,10 @@ This document maps out the exact access control matrix for all 10 core tables in
 | | `INSERT` | Deny | Deny | Deny | Deny | Deny | All | Yes |
 | | `UPDATE` | Deny | Deny | Deny | Deny | Deny | All | Yes |
 | | `DELETE` | Deny | Deny | Deny | Deny | Deny | All | Yes |
-| **push_subscriptions** | `SELECT` | Deny | Own only | Own only | Own only | Own only | All | Yes |
-| | `INSERT` | Deny | Own only | Own only | Own only | Own only | All | Yes |
-| | `UPDATE` | Deny | Own only | Own only | Own only | Own only | All | Yes |
-| | `DELETE` | Deny | Own only | Own only | Own only | Own only | All | Yes |
+| **push_subscriptions** | `SELECT` | Deny | Own only | Own only | Own only | Own only | All | Untested |
+| | `INSERT` | Deny | Own only | Own only | Own only | Own only | All | Untested |
+| | `UPDATE` | Deny | Own only | Own only | Own only | Own only | All | Untested |
+| | `DELETE` | Deny | Own only | Own only | Own only | Own only | All | Untested |
 
 ---
 
