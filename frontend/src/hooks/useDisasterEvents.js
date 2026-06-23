@@ -5,7 +5,7 @@ import { supabase } from '@/services/supabaseClient';
 import { eventsApi } from '@/services/backendApi';
 import useAppStore from '@/store/useAppStore';
 
-let socket = null;
+export let socket = null;
 
 /**
  * Hook to fetch and subscribe to disaster events.

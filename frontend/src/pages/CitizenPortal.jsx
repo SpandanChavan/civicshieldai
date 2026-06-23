@@ -4,6 +4,8 @@ import { supabase } from '@/services/supabaseClient';
 import { useAuth } from '@/hooks/useAuth';
 import useAppStore from '@/store/useAppStore';
 import { backendApi } from '@/services/backendApi';
+import SOSButton from '@/components/sos/SOSButton';
+import EmergencyContactsEditor from '@/components/sos/EmergencyContactsEditor';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertTriangle, FileText, MapPin, Send, X,
@@ -181,6 +183,25 @@ export default function CitizenPortal() {
 
         {/* ── Main content ──────────────────────────────── */}
         <div style={{ maxWidth: 960, margin: '0 auto', padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 28 }}>
+
+          {/* ── Emergency SOS ────────────────────────────── */}
+          <section style={{ marginBottom: '0.5rem' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: '800', color: 'white', marginBottom: '0.5rem' }}>
+              Emergency SOS
+            </h2>
+            <p style={{ fontSize: '13px', color: '#cbd5e1', marginBottom: '1rem' }}>
+              In a life-threatening emergency, tap below to instantly alert your state coordinator and notify your emergency contacts.
+            </p>
+
+            {/* SOS Button — handles the full flow internally */}
+            <SOSButton />
+
+            {/* Emergency contacts editor — visible below the SOS button */}
+            <EmergencyContactsEditor
+              initialContacts={profile?.emergency_contacts || []}
+              userId={user?.id}
+            />
+          </section>
 
           {/* Success banner */}
           <AnimatePresence>

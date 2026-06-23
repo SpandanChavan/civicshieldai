@@ -12,6 +12,7 @@ import MisinformationPanel from '@/components/dashboard/MisinformationPanel';
 import ReportsQueue from '@/components/dashboard/ReportsQueue';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EmptyState from '@/components/shared/EmptyState';
+import SOSAlertPanel from '@/components/sos/SOSAlertPanel';
 import { useTranslation } from '@/utils/i18n';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -248,6 +249,7 @@ export default function CoordinatorDashboard({ compact = false, selectedMapEvent
 
       {/* ── Content Area ── */}
       <div className="flex-1 overflow-y-auto overflow-x-hidden p-4">
+        <SOSAlertPanel />
         <AnimatePresence mode="wait">
           {!activeModule ? (
             <motion.div
