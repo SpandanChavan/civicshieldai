@@ -53,6 +53,7 @@ export default function CitizenPortal() {
   const [locationError, setLocationError] = useState('');
   const [form, setForm] = useState({
     description: '',
+    category: '',
     reporter_name: profile?.full_name || '',
     reporter_contact: user?.email || '',
   });
@@ -102,6 +103,7 @@ export default function CitizenPortal() {
 
       await backendApi.post('/incidents', {
         description: form.description,
+        category: form.category,
         reporter_name: form.reporter_name,
         reporter_contact: form.reporter_contact,
         location,
@@ -109,7 +111,7 @@ export default function CitizenPortal() {
       });
       setSubmitSuccess(true);
       setShowForm(false);
-      setForm({ description: '', reporter_name: profile?.full_name || '', reporter_contact: user?.email || '' });
+      setForm({ description: '', category: '', reporter_name: profile?.full_name || '', reporter_contact: user?.email || '' });
       setMediaFile(null);
       fetchMyReports();
       setTimeout(() => setSubmitSuccess(false), 5000);
@@ -228,6 +230,25 @@ export default function CitizenPortal() {
                       required placeholder="Describe what happened, extent of damage, number of people affected…"
                       className="cp-textarea"
                       style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10, padding: '11px 14px', fontSize: 14, color: 'white', minHeight: 100, resize: 'vertical' }} />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>Category *</label>
+                    <select id="incident-category" value={form.category}
+                      onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                      required
+                      className="cp-input"
+                      style={{ width: '100%', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', borderRadius: 10, padding: '11px 14px', fontSize: 14, color: 'white' }}>
+                      <option value="" disabled>Select category</option>
+                      <option value="flood">Flood</option>
+                      <option value="fire">Fire</option>
+                      <option value="earthquake_damage">Earthquake Damage</option>
+                      <option value="landslide">Landslide</option>
+                      <option value="cyclone">Cyclone</option>
+                      <option value="medical_emergency">Medical Emergency</option>
+                      <option value="road_block">Road Block</option>
+                      <option value="other">Other</option>
+                    </select>
                   </div>
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>

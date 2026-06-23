@@ -7,6 +7,7 @@ const router = express.Router();
 
 const IncidentSchema = z.object({
   description: z.string().min(10).max(2000),
+  category: z.string().optional(),
   location: z.object({
     lat: z.number().min(-90).max(90),
     lon: z.number().min(-180).max(180),
