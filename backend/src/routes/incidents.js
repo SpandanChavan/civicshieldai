@@ -150,7 +150,10 @@ router.post('/', incidentLimiter, async (req, res) => {
 
 // ── PATCH /api/incidents/:id/approve ─────────────────
 // Coordinator approves a report. Optionally creates an official alert.
-const ApproveSchema = z.object({}).strict();
+const ApproveSchema = z.object({
+  event_type: z.string(),
+  severity: z.enum(['Low', 'Medium', 'High', 'Critical']).optional().default('Medium')
+});
 
 router.patch('/:id/approve', async (req, res) => {
   const parsed = ApproveSchema.safeParse(req.body);
@@ -162,23 +165,50 @@ router.patch('/:id/approve', async (req, res) => {
     return res.status(403).json({ error: 'Coordinators only' });
   }
 
-  if (req.userRole === 'coordinator') {
-    const { data: incident } = await getDb()
+  try {
+    const db = getDb();
+    const { event_type, severity } = parsed.data;
+
+    const { data: incident, error: fetchError } = await db
       .from('incident_reports')
-      .select('state_id')
+      .select('*')
       .eq('id', req.params.id)
       .single();
-    if (!incident || incident.state_id !== req.userStateId) {
+    
+    if (fetchError || !incident) {
+      return res.status(404).json({ error: 'Incident not found' });
+    }
+
+    if (req.userRole === 'coordinator' && incident.state_id !== req.userStateId) {
       return res.status(403).json({ error: 'Forbidden: Incident belongs to another state' });
     }
-  }
-  try {
-    const { data, error } = await getDb()
+
+    // Insert into events table
+    const { data: newEvent, error: eventError } = await db
+      .from('events')
+      .insert({
+        title: incident.category ? incident.category.replace('_', ' ').toUpperCase() : 'INCIDENT',
+        description: incident.description,
+        event_type: event_type,
+        location: incident.location,
+        severity: severity,
+        state_id: incident.state_id,
+        source: 'citizen_report',
+        is_active: true
+      })
+      .select()
+      .single();
+
+    if (eventError) throw eventError;
+
+    // Update incident report
+    const { data, error } = await db
       .from('incident_reports')
       .update({
         status: 'approved',
         reviewer_id: req.userId,
         reviewed_at: new Date().toISOString(),
+        event_id: newEvent.id
       })
       .eq('id', req.params.id)
       .select()
