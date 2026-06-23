@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { backendApi } from '@/services/backendApi';
 import { useAuth } from '@/hooks/useAuth';
+import useAppStore from '@/store/useAppStore';
 import { Clock, Search, CheckCircle2, XCircle, Check, ClipboardList, MapPin, User, CheckCircle, X } from 'lucide-react';
 
 const STATUS_STYLES = {
@@ -48,6 +49,7 @@ function RejectModal({ report, onClose, onReject }) {
 export default function ReportsQueue() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
+  const addNotification = useAppStore(state => state.addNotification);
   const [rejectTarget, setRejectTarget] = useState(null);
   const [filter, setFilter] = useState('pending_review');
 
@@ -67,6 +69,13 @@ export default function ReportsQueue() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['incidents'] });
     },
+    onError: (err) => {
+      addNotification({ 
+        title: 'Approval Failed', 
+        message: err.response?.data?.error || err.message, 
+        type: 'error' 
+      });
+    }
   });
 
   const rejectMutation = useMutation({
@@ -75,6 +84,13 @@ export default function ReportsQueue() {
       queryClient.invalidateQueries({ queryKey: ['incidents'] });
       setRejectTarget(null);
     },
+    onError: (err) => {
+      addNotification({ 
+        title: 'Rejection Failed', 
+        message: err.response?.data?.error || err.message, 
+        type: 'error' 
+      });
+    }
   });
 
   const pendingCount = reports.filter(r => r.status === 'pending_review').length;
@@ -147,6 +163,13 @@ export default function ReportsQueue() {
                 <p className="text-xs text-slate-300 leading-relaxed">
                   {report.description?.slice(0, 150)}{report.description?.length > 150 ? '…' : ''}
                 </p>
+
+                {/* Media Preview */}
+                {report.media_urls?.length > 0 && (
+                  <div className="w-full h-32 rounded-lg overflow-hidden border border-white/10 mt-2">
+                    <img src={report.media_urls[0]} alt="Incident media" className="w-full h-full object-cover" />
+                  </div>
+                )}
 
                 {/* Reporter info */}
                 {(report.reporter_name || report.reporter_contact) && (

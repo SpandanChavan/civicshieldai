@@ -182,8 +182,6 @@ CREATE TRIGGER trg_resources_updated_at BEFORE UPDATE ON public.resources
 CREATE TABLE IF NOT EXISTS public.incident_reports (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   reporter_id      UUID         REFERENCES auth.users(id)    ON DELETE SET NULL,
-  reporter_name    TEXT,
-  reporter_contact TEXT,
   description      TEXT         NOT NULL,
   location         GEOGRAPHY(POINT, 4326),
   media_urls       TEXT[],
@@ -198,7 +196,9 @@ CREATE TABLE IF NOT EXISTS public.incident_reports (
   state_id         UUID         REFERENCES public.states(id) ON DELETE SET NULL,
   reviewer_id      UUID         REFERENCES auth.users(id)    ON DELETE SET NULL,
   reviewed_at      TIMESTAMPTZ,
-  rejection_reason TEXT
+  rejection_reason TEXT,
+  reporter_name    TEXT,
+  reporter_contact TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_reports_location ON public.incident_reports USING GIST (location);
 CREATE INDEX IF NOT EXISTS idx_reports_status   ON public.incident_reports (status, created_at DESC);
@@ -289,11 +289,12 @@ CREATE INDEX IF NOT EXISTS idx_push_user ON public.push_subscriptions (user_id);
 CREATE OR REPLACE FUNCTION public.handle_new_user_unified()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.user_profiles (id, full_name, role)
+  INSERT INTO public.user_profiles (id, full_name, role, state_id)
   VALUES (
     NEW.id,
     NEW.raw_user_meta_data->>'full_name',
-    COALESCE(NEW.raw_user_meta_data->>'role', 'citizen')
+    COALESCE(NEW.raw_user_meta_data->>'role', 'citizen'),
+    NULLIF(NEW.raw_user_meta_data->>'state_id', '')::uuid
   )
   ON CONFLICT (id) DO NOTHING;  -- idempotent if row somehow exists
 

@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertTriangle, FileText, MapPin, Send, X,
   CheckCircle2, Clock, Eye, XCircle, CheckSquare,
-  ChevronRight, Radio, Plus, ExternalLink,
+  ChevronRight, Radio, Plus, ExternalLink, Camera
 } from 'lucide-react';
 
 const STATUS_CONFIG = {
@@ -56,6 +56,7 @@ export default function CitizenPortal() {
     reporter_name: profile?.full_name || '',
     reporter_contact: user?.email || '',
   });
+  const [mediaFile, setMediaFile] = useState(null);
 
   const nearbyEvents = events.filter(e => e.is_active).slice(0, 5);
   const criticalCount = events.filter(e => e.severity === 'Critical').length;
@@ -86,15 +87,30 @@ export default function CitizenPortal() {
     if (form.description.trim().length < 10) { setFormError('Description must be at least 10 characters.'); return; }
     setSubmitting(true);
     try {
+      let mediaUrl = null;
+      if (mediaFile) {
+        const fileExt = mediaFile.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = `${user.id || 'anonymous'}/${fileName}`;
+        
+        const { error: uploadError } = await supabase.storage.from('incident-media').upload(filePath, mediaFile);
+        if (uploadError) throw new Error('Image upload failed: ' + uploadError.message);
+        
+        const { data } = supabase.storage.from('incident-media').getPublicUrl(filePath);
+        mediaUrl = data.publicUrl;
+      }
+
       await backendApi.post('/incidents', {
         description: form.description,
         reporter_name: form.reporter_name,
         reporter_contact: form.reporter_contact,
         location,
+        media_urls: mediaUrl ? [mediaUrl] : [],
       });
       setSubmitSuccess(true);
       setShowForm(false);
       setForm({ description: '', reporter_name: profile?.full_name || '', reporter_contact: user?.email || '' });
+      setMediaFile(null);
       fetchMyReports();
       setTimeout(() => setSubmitSuccess(false), 5000);
     } catch (err) {
@@ -229,6 +245,17 @@ export default function CitizenPortal() {
                     </div>
                   </div>
 
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 7 }}>Attach Photo (Optional)</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.09)', color: 'white', fontSize: 13, cursor: 'pointer' }}>
+                        <Camera size={14} /> {mediaFile ? 'Change Photo' : 'Capture / Upload'}
+                        <input type="file" accept="image/*" capture="environment" onChange={e => setMediaFile(e.target.files[0])} style={{ display: 'none' }} />
+                      </label>
+                      {mediaFile && <span style={{ fontSize: 12, color: '#10b981', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mediaFile.name}</span>}
+                    </div>
+                  </div>
+
                   {/* Location status */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 12px', borderRadius: 8, background: location ? 'rgba(16,185,129,0.06)' : 'rgba(255,255,255,0.03)', border: `1px solid ${location ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.07)'}` }}>
                     <MapPin size={13} color={location ? '#10b981' : '#64748b'} />
@@ -295,6 +322,11 @@ export default function CitizenPortal() {
                         <p style={{ fontSize: 13, color: '#cbd5e1', flex: 1, lineHeight: 1.55, margin: 0 }}>
                           {report.description?.slice(0, 140)}{report.description?.length > 140 ? '…' : ''}
                         </p>
+                        {report.media_urls?.length > 0 && (
+                          <div style={{ flexShrink: 0, width: 48, height: 48, borderRadius: 8, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.1)' }}>
+                            <img src={report.media_urls[0]} alt="Incident" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          </div>
+                        )}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 999, background: s.bg, border: `1px solid ${s.border}`, flexShrink: 0 }}>
                           <StatusIcon size={11} color={s.color} />
                           <span style={{ fontSize: 10, fontWeight: 700, color: s.color }}>{s.label}</span>
