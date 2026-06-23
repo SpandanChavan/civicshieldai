@@ -74,6 +74,18 @@ export const incidentsApi = {
   updateStatus: (id, status) => backendApi.patch(`/incidents/${id}/status`, { status }),
 };
 
+// ── SOS API ───────────────────────────────────────────
+export const sosApi = {
+  create: (data) => backendApi.post('/sos', data),
+  getAll: (params) => backendApi.get('/sos', { params }),
+  getMine: () => backendApi.get('/sos/mine'),
+  getNearestSafeZones: (lat, lon) => backendApi.get('/sos/nearest-safe-zones', { params: { lat, lon } }),
+  getById: (id) => backendApi.get(`/sos/${id}`),
+  acknowledge: (id, data) => backendApi.patch(`/sos/${id}/acknowledge`, data),
+  resolve: (id) => backendApi.patch(`/sos/${id}/resolve`),
+  cancel: (id) => backendApi.patch(`/sos/${id}/cancel`),
+};
+
 // ── ML API ────────────────────────────────────────────
 export const mlApiService = {
   predictRisk: (data) => mlApi.post('/predict/risk', data),
