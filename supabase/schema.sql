@@ -232,7 +232,7 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
   updated_at  TIMESTAMPTZ DEFAULT NOW(),
   state_id    UUID REFERENCES public.states(id) ON DELETE SET NULL,
   assigned_at TIMESTAMPTZ,
-  emergency_contacts JSONB DEFAULT '[]'::jsonb
+  emergency_contacts JSONB NOT NULL DEFAULT '[]'::jsonb
 );
 CREATE INDEX IF NOT EXISTS idx_user_profiles_state ON public.user_profiles (state_id);
 CREATE INDEX IF NOT EXISTS idx_user_profiles_role  ON public.user_profiles (role);
@@ -274,28 +274,42 @@ CREATE INDEX IF NOT EXISTS idx_misinfo_analyzed ON public.misinformation_checks 
 -- TABLE: sos_requests
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.sos_requests (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id         UUID         NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  latitude        FLOAT        NOT NULL,
-  longitude       FLOAT        NOT NULL,
-  location        GEOGRAPHY(POINT, 4326) NOT NULL,
-  message         TEXT,
-  event_id        UUID         REFERENCES public.events(id) ON DELETE SET NULL,
-  state_id        UUID         REFERENCES public.states(id) ON DELETE SET NULL,
-  status          TEXT         DEFAULT 'active' CHECK (status IN ('active', 'acknowledged', 'resolved', 'cancelled')),
-  acknowledged_at TIMESTAMPTZ,
-  resolved_at     TIMESTAMPTZ,
-  cancelled_at    TIMESTAMPTZ,
-  created_at      TIMESTAMPTZ  DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ  DEFAULT NOW()
+  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  latitude          FLOAT       NOT NULL,
+  longitude         FLOAT       NOT NULL,
+  location          GEOGRAPHY(POINT, 4326) NOT NULL,
+  status            TEXT        NOT NULL DEFAULT 'active'
+                                CHECK (status IN ('active','acknowledged','resolved','cancelled')),
+  message           TEXT,
+  event_id          UUID        REFERENCES public.events(id) ON DELETE SET NULL,
+  state_id          UUID        REFERENCES public.states(id) ON DELETE SET NULL,
+  acknowledged_by   UUID        REFERENCES auth.users(id) ON DELETE SET NULL,
+  acknowledged_at   TIMESTAMPTZ,
+  resolved_at       TIMESTAMPTZ,
+  cancelled_at      TIMESTAMPTZ,
+  device_info       JSONB,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-CREATE INDEX IF NOT EXISTS idx_sos_location ON public.sos_requests USING GIST (location);
-CREATE INDEX IF NOT EXISTS idx_sos_status   ON public.sos_requests (status, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_sos_state    ON public.sos_requests (state_id);
 
-DROP TRIGGER IF EXISTS trg_sos_requests_updated_at ON public.sos_requests;
-CREATE TRIGGER trg_sos_requests_updated_at BEFORE UPDATE ON public.sos_requests
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+CREATE INDEX IF NOT EXISTS idx_sos_user_id
+  ON public.sos_requests(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_sos_status
+  ON public.sos_requests(status);
+
+CREATE INDEX IF NOT EXISTS idx_sos_state_id
+  ON public.sos_requests(state_id);
+
+CREATE INDEX IF NOT EXISTS idx_sos_location
+  ON public.sos_requests USING GIST(location);
+
+CREATE INDEX IF NOT EXISTS idx_sos_created_at
+  ON public.sos_requests(created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_sos_active_state
+  ON public.sos_requests(state_id, created_at DESC)
+  WHERE status = 'active';
 
 
 -- ============================================================================
@@ -401,15 +415,15 @@ DO $$ BEGIN CREATE POLICY "Users manage own push subscriptions"     ON public.pu
 DO $$ BEGIN CREATE POLICY "Service role manages push subscriptions" ON public.push_subscriptions FOR ALL USING (auth.role() = 'service_role'); EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 -- sos_requests
-DO $$ BEGIN CREATE POLICY "Citizens can create SOS" ON public.sos_requests FOR INSERT WITH CHECK (auth.uid() = user_id); EXCEPTION WHEN duplicate_object THEN null; END $$;
-DO $$ BEGIN CREATE POLICY "Citizens can view own SOS" ON public.sos_requests FOR SELECT USING (auth.uid() = user_id); EXCEPTION WHEN duplicate_object THEN null; END $$;
-DO $$ BEGIN CREATE POLICY "Citizens can cancel own active SOS" ON public.sos_requests FOR UPDATE USING (auth.uid() = user_id AND status = 'active') WITH CHECK (auth.uid() = user_id); EXCEPTION WHEN duplicate_object THEN null; END $$;
-DO $$ BEGIN CREATE POLICY "Coordinators view state SOS" ON public.sos_requests FOR SELECT USING ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'coordinator' AND state_id = (SELECT state_id FROM user_profiles WHERE id = auth.uid())); EXCEPTION WHEN duplicate_object THEN null; END $$;
-DO $$ BEGIN CREATE POLICY "Coordinators update state SOS" ON public.sos_requests FOR UPDATE USING ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'coordinator' AND state_id = (SELECT state_id FROM user_profiles WHERE id = auth.uid())) WITH CHECK ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'coordinator'); EXCEPTION WHEN duplicate_object THEN null; END $$;
-DO $$ BEGIN CREATE POLICY "Admins have full SOS access" ON public.sos_requests FOR ALL USING ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'admin') WITH CHECK ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'admin'); EXCEPTION WHEN duplicate_object THEN null; END $$;
-DO $$ BEGIN CREATE POLICY "Responders read SOS" ON public.sos_requests FOR SELECT USING ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'responder'); EXCEPTION WHEN duplicate_object THEN null; END $$;
-DO $$ BEGIN CREATE POLICY "Responders resolve SOS" ON public.sos_requests FOR UPDATE USING ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'responder') WITH CHECK ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'responder'); EXCEPTION WHEN duplicate_object THEN null; END $$;
-DO $$ BEGIN CREATE POLICY "Service role bypass SOS" ON public.sos_requests FOR ALL USING (auth.role() = 'service_role'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Citizens can create SOS" ON public.sos_requests FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Citizens can view own SOS" ON public.sos_requests FOR SELECT TO authenticated USING (auth.uid() = user_id); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Citizens can cancel own active SOS" ON public.sos_requests FOR UPDATE TO authenticated USING (auth.uid() = user_id AND status = 'active') WITH CHECK (auth.uid() = user_id); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Coordinators view state SOS" ON public.sos_requests FOR SELECT TO authenticated USING ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'coordinator' AND state_id = (SELECT state_id FROM user_profiles WHERE id = auth.uid())); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Coordinators update state SOS" ON public.sos_requests FOR UPDATE TO authenticated USING ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'coordinator' AND state_id = (SELECT state_id FROM user_profiles WHERE id = auth.uid())) WITH CHECK ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'coordinator'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Admins have full SOS access" ON public.sos_requests FOR ALL TO authenticated USING ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'admin') WITH CHECK ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'admin'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Responders read SOS" ON public.sos_requests FOR SELECT TO authenticated USING ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'responder'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Responders resolve SOS" ON public.sos_requests FOR UPDATE TO authenticated USING ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'responder') WITH CHECK ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'responder'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Service role bypass SOS" ON public.sos_requests FOR ALL TO service_role USING (true) WITH CHECK (true); EXCEPTION WHEN duplicate_object THEN null; END $$;
 
 -- ============================================================================
 -- FUNCTION: get_nearest_safe_zones
