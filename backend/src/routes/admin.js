@@ -1,5 +1,6 @@
 const express = require('express');
 const { createClient } = require('@supabase/supabase-js');
+const { z } = require('zod');
 const router = express.Router();
 
 function getDb() {

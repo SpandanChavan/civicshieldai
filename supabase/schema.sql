@@ -182,6 +182,8 @@ CREATE TRIGGER trg_resources_updated_at BEFORE UPDATE ON public.resources
 CREATE TABLE IF NOT EXISTS public.incident_reports (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   reporter_id      UUID         REFERENCES auth.users(id)    ON DELETE SET NULL,
+  reporter_name    TEXT,
+  reporter_contact TEXT,
   description      TEXT         NOT NULL,
   location         GEOGRAPHY(POINT, 4326),
   media_urls       TEXT[],
