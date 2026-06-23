@@ -12,7 +12,7 @@ Re-rate at the end of each phase and watch the numbers move. Scores are 0–10, 
 | Security | 6.5 | 7.5 | 7.5 | 9 | RLS audited + tested; over-permissive profiles policy removed. Output-sanitization sweep (P1-4) still open |
 | Reliability | 6.0 | 7.0 | 7.5 | 8 | Two real CI gates now; single DB / no DR still |
 | AI/ML genuineness | 5.0 | 5.0 | 5.0 | 8 | Unchanged — needs validation/metrics |
-| Frontend/UX | 6.0 | 6.0 | 6.0 | 8 | Unchanged — no real tests yet (P1-2) |
+| Frontend/UX | 6.0 | 6.0 | 6.5 | 8 | Partial frontend test coverage |
 | Observability/ops | 4.0 | 4.0 | 4.0 | 8 | Unchanged — dashboards/runbooks pending (P1-5) |
 | Testing/QA | 3.0 | 6.5 | 7.0 | 8 | Real integration tests + schema-drift guard gate every PR. Frontend tests + unit depth still thin |
 | Deploy readiness | 3.5 | 6.0 | 6.5 | 9 | Reproducible + drift-guarded schema, green CI gate. Single DB, auto-deploy off (history needs repair), no DR |

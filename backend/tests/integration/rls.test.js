@@ -14,8 +14,9 @@ async function runRLSTest() {
   const { data: citizen2Auth, error: e2 } = await adminDb.auth.admin.createUser({ email: `rls_cit2_${suffix}@test.local`, password: 'password123', email_confirm: true });
   const { data: coordAuth, error: e3 } = await adminDb.auth.admin.createUser({ email: `rls_coord_${suffix}@test.local`, password: 'password123', email_confirm: true });
   const { data: respAuth, error: e4 } = await adminDb.auth.admin.createUser({ email: `rls_resp_${suffix}@test.local`, password: 'password123', email_confirm: true });
+  const { data: adminUserAuth, error: e_adm } = await adminDb.auth.admin.createUser({ email: `rls_admin_${suffix}@test.local`, password: 'password123', email_confirm: true });
 
-  if (e1 || e2 || e3 || e4) console.error("Error creating users:", e1, e2, e3, e4);
+  if (e1 || e2 || e3 || e4 || e_adm) console.error("Error creating users:", e1, e2, e3, e4, e_adm);
 
   // Wait 1s for auth triggers to complete before we upsert over them
   await new Promise(resolve => setTimeout(resolve, 1000));
@@ -24,7 +25,8 @@ async function runRLSTest() {
     { id: citizen1Auth.user.id, role: 'citizen' },
     { id: citizen2Auth.user.id, role: 'citizen' },
     { id: coordAuth.user.id, role: 'coordinator' },
-    { id: respAuth.user.id, role: 'responder' }
+    { id: respAuth.user.id, role: 'responder' },
+    { id: adminUserAuth.user.id, role: 'admin' }
   ]);
   if (e5) console.error("Error upserting profiles:", e5);
 
@@ -57,10 +59,12 @@ async function runRLSTest() {
   const { data: cit1Login } = await anonDb.auth.signInWithPassword({ email: `rls_cit1_${suffix}@test.local`, password: 'password123' });
   const { data: coordLogin } = await anonDb.auth.signInWithPassword({ email: `rls_coord_${suffix}@test.local`, password: 'password123' });
   const { data: respLogin } = await anonDb.auth.signInWithPassword({ email: `rls_resp_${suffix}@test.local`, password: 'password123' });
+  const { data: adminLogin } = await anonDb.auth.signInWithPassword({ email: `rls_admin_${suffix}@test.local`, password: 'password123' });
   
   const cit1Db = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, { global: { headers: { Authorization: `Bearer ${cit1Login.session.access_token}` } } });
   const coordDb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, { global: { headers: { Authorization: `Bearer ${coordLogin.session.access_token}` } } });
   const respDb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, { global: { headers: { Authorization: `Bearer ${respLogin.session.access_token}` } } });
+  const adminTestDb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY, { global: { headers: { Authorization: `Bearer ${adminLogin.session.access_token}` } } });
 
   // Reset anonDb so it doesn't hold the responder session
   await anonDb.auth.signOut();
@@ -115,6 +119,16 @@ async function runRLSTest() {
     const { data: coordReports, error: errCrdRep } = await coordDb.from('incident_reports').select('*').in('id', [report1.id, report2.id]);
     assertRule("Coordinator can read ALL incident_reports", coordReports && coordReports.length === 2, coordReports || errCrdRep);
 
+    console.log("\n--- Testing admin ---");
+    const { data: adminAud, error: errAdmAud } = await adminTestDb.from('audit_logs').select('*');
+    assertRule("Admin cannot read audit_logs", adminAud === null || adminAud.length === 0, adminAud || errAdmAud);
+
+    const { data: adminMisinfo, error: errAdmMis } = await adminTestDb.from('misinformation_checks').select('*');
+    assertRule("Admin can read misinformation_checks", adminMisinfo && adminMisinfo.length > 0, adminMisinfo || errAdmMis);
+
+    const { data: adminReports, error: errAdmRep } = await adminTestDb.from('incident_reports').select('*').in('id', [report1.id, report2.id]);
+    assertRule("Admin can read ALL incident_reports", adminReports && adminReports.length === 2, adminReports || errAdmRep);
+
     console.log("\n--- Testing service_role ---");
     const { data: srAudit, error: errSrAud } = await adminDb.from('audit_logs').select('id').limit(1);
     assertRule("Service_role can read audit_logs", srAudit !== null, errSrAud);
@@ -128,6 +142,7 @@ async function runRLSTest() {
     await adminDb.auth.admin.deleteUser(citizen2Auth.user.id);
     await adminDb.auth.admin.deleteUser(coordAuth.user.id);
     await adminDb.auth.admin.deleteUser(respAuth.user.id);
+    await adminDb.auth.admin.deleteUser(adminUserAuth.user.id);
     
     if (failures > 0) process.exit(1);
   }
