@@ -16,7 +16,7 @@
 const express = require('express');
 const { z } = require('zod');
 const { getAdminDb } = require('../lib/db');
-const { auditLog } = require('../utils/auditLogger');
+const { logAudit } = require('../utils/auditLogger');
 const notificationRouter = require('../services/notificationRouter');
 
 const router = express.Router();
@@ -119,7 +119,7 @@ router.post('/', validate(createSosSchema), async (req, res, next) => {
     if (insertError) throw insertError;
 
     // ── 5. Audit log ─────────────────────────────────────────────────────────
-    await auditLog(req.userId, 'SOS_CREATED', sos.id, {
+    await logAudit('SOS_CREATED', req.userId, sos.id, {
       latitude,
       longitude,
       state_id: stateId,
@@ -417,7 +417,7 @@ router.patch('/:id/acknowledge', async (req, res, next) => {
 
     if (updateErr) throw updateErr;
 
-    await auditLog(req.userId, 'SOS_ACKNOWLEDGED', req.params.id, { eta_minutes, note });
+    await logAudit('SOS_ACKNOWLEDGED', req.userId, req.params.id, { eta_minutes, note });
 
     // Notify the citizen via their personal Socket.io room (Correction 3: use req.app.get('io'))
     const io = req.app.get('io');
@@ -474,7 +474,7 @@ router.patch('/:id/resolve', async (req, res, next) => {
 
     if (updateErr) throw updateErr;
     
-    await auditLog(req.userId, 'SOS_RESOLVED', req.params.id);
+    await logAudit('SOS_RESOLVED', req.userId, req.params.id);
 
     // Notify the citizen (Correction 3: use req.app.get('io'))
     const io = req.app.get('io');
