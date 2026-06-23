@@ -139,6 +139,10 @@ router.post('/', incidentLimiter, async (req, res) => {
     });
 
     res.status(201).json({ data });
+
+    if (finalStateId && req.app.get('io')) {
+      req.app.get('io').to(`state:${finalStateId}`).emit('new_incident', data);
+    }
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -156,6 +160,17 @@ router.patch('/:id/approve', async (req, res) => {
 
   if (req.userRole !== 'coordinator' && req.userRole !== 'admin') {
     return res.status(403).json({ error: 'Coordinators only' });
+  }
+
+  if (req.userRole === 'coordinator') {
+    const { data: incident } = await getDb()
+      .from('incident_reports')
+      .select('state_id')
+      .eq('id', req.params.id)
+      .single();
+    if (!incident || incident.state_id !== req.userStateId) {
+      return res.status(403).json({ error: 'Forbidden: Incident belongs to another state' });
+    }
   }
   try {
     const { data, error } = await getDb()
@@ -186,7 +201,17 @@ router.patch('/:id/reject', async (req, res) => {
   if (req.userRole !== 'coordinator' && req.userRole !== 'admin') {
     return res.status(403).json({ error: 'Coordinators only' });
   }
-  
+
+  if (req.userRole === 'coordinator') {
+    const { data: incident } = await getDb()
+      .from('incident_reports')
+      .select('state_id')
+      .eq('id', req.params.id)
+      .single();
+    if (!incident || incident.state_id !== req.userStateId) {
+      return res.status(403).json({ error: 'Forbidden: Incident belongs to another state' });
+    }
+  }
   const parsed = RejectSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
@@ -227,6 +252,17 @@ router.patch('/:id/status', async (req, res) => {
   }
   if (req.userRole !== 'coordinator' && req.userRole !== 'admin') {
     return res.status(403).json({ error: 'Forbidden: Coordinators and admins only' });
+  }
+
+  if (req.userRole === 'coordinator') {
+    const { data: incident } = await getDb()
+      .from('incident_reports')
+      .select('state_id')
+      .eq('id', req.params.id)
+      .single();
+    if (!incident || incident.state_id !== req.userStateId) {
+      return res.status(403).json({ error: 'Forbidden: Incident belongs to another state' });
+    }
   }
   
   const parsed = StatusSchema.safeParse(req.body);
