@@ -196,7 +196,9 @@ CREATE TABLE IF NOT EXISTS public.incident_reports (
   state_id         UUID         REFERENCES public.states(id) ON DELETE SET NULL,
   reviewer_id      UUID         REFERENCES auth.users(id)    ON DELETE SET NULL,
   reviewed_at      TIMESTAMPTZ,
-  rejection_reason TEXT
+  rejection_reason TEXT,
+  reporter_name    TEXT,
+  reporter_contact TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_reports_location ON public.incident_reports USING GIST (location);
 CREATE INDEX IF NOT EXISTS idx_reports_status   ON public.incident_reports (status, created_at DESC);
@@ -229,7 +231,8 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
   created_at  TIMESTAMPTZ DEFAULT NOW(),
   updated_at  TIMESTAMPTZ DEFAULT NOW(),
   state_id    UUID REFERENCES public.states(id) ON DELETE SET NULL,
-  assigned_at TIMESTAMPTZ
+  assigned_at TIMESTAMPTZ,
+  emergency_contacts JSONB NOT NULL DEFAULT '[]'::jsonb
 );
 CREATE INDEX IF NOT EXISTS idx_user_profiles_state ON public.user_profiles (state_id);
 CREATE INDEX IF NOT EXISTS idx_user_profiles_role  ON public.user_profiles (role);
@@ -268,6 +271,48 @@ CREATE INDEX IF NOT EXISTS idx_misinfo_report   ON public.misinformation_checks 
 CREATE INDEX IF NOT EXISTS idx_misinfo_analyzed ON public.misinformation_checks (analyzed_at DESC);
 
 -- ============================================================================
+-- TABLE: sos_requests
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS public.sos_requests (
+  id                UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id           UUID        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  latitude          FLOAT       NOT NULL,
+  longitude         FLOAT       NOT NULL,
+  location          GEOGRAPHY(POINT, 4326) NOT NULL,
+  status            TEXT        NOT NULL DEFAULT 'active'
+                                CHECK (status IN ('active','acknowledged','resolved','cancelled')),
+  message           TEXT,
+  event_id          UUID        REFERENCES public.events(id) ON DELETE SET NULL,
+  state_id          UUID        REFERENCES public.states(id) ON DELETE SET NULL,
+  acknowledged_by   UUID        REFERENCES auth.users(id) ON DELETE SET NULL,
+  acknowledged_at   TIMESTAMPTZ,
+  resolved_at       TIMESTAMPTZ,
+  cancelled_at      TIMESTAMPTZ,
+  device_info       JSONB,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_sos_user_id
+  ON public.sos_requests(user_id);
+
+CREATE INDEX IF NOT EXISTS idx_sos_status
+  ON public.sos_requests(status);
+
+CREATE INDEX IF NOT EXISTS idx_sos_state_id
+  ON public.sos_requests(state_id);
+
+CREATE INDEX IF NOT EXISTS idx_sos_location
+  ON public.sos_requests USING GIST(location);
+
+CREATE INDEX IF NOT EXISTS idx_sos_created_at
+  ON public.sos_requests(created_at DESC);
+
+CREATE INDEX IF NOT EXISTS idx_sos_active_state
+  ON public.sos_requests(state_id, created_at DESC)
+  WHERE status = 'active';
+
+
+-- ============================================================================
 -- TABLE: push_subscriptions
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS public.push_subscriptions (
@@ -287,11 +332,12 @@ CREATE INDEX IF NOT EXISTS idx_push_user ON public.push_subscriptions (user_id);
 CREATE OR REPLACE FUNCTION public.handle_new_user_unified()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.user_profiles (id, full_name, role)
+  INSERT INTO public.user_profiles (id, full_name, role, state_id)
   VALUES (
     NEW.id,
     NEW.raw_user_meta_data->>'full_name',
-    COALESCE(NEW.raw_user_meta_data->>'role', 'citizen')
+    COALESCE(NEW.raw_user_meta_data->>'role', 'citizen'),
+    NULLIF(NEW.raw_user_meta_data->>'state_id', '')::uuid
   )
   ON CONFLICT (id) DO NOTHING;  -- idempotent if row somehow exists
 
@@ -324,6 +370,7 @@ ALTER TABLE public.states                ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.audit_logs            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.misinformation_checks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.push_subscriptions    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sos_requests          ENABLE ROW LEVEL SECURITY;
 
 -- Helper to (re)create a policy idempotently
 -- (Postgres has no CREATE POLICY IF NOT EXISTS; guard with exception blocks.)
@@ -367,6 +414,70 @@ DO $$ BEGIN CREATE POLICY "Coordinators read misinformation checks" ON public.mi
 DO $$ BEGIN CREATE POLICY "Users manage own push subscriptions"     ON public.push_subscriptions FOR ALL    USING (user_id = auth.uid());           EXCEPTION WHEN duplicate_object THEN null; END $$;
 DO $$ BEGIN CREATE POLICY "Service role manages push subscriptions" ON public.push_subscriptions FOR ALL USING (auth.role() = 'service_role'); EXCEPTION WHEN duplicate_object THEN null; END $$;
 
+-- sos_requests
+DO $$ BEGIN CREATE POLICY "Citizens can create SOS" ON public.sos_requests FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Citizens can view own SOS" ON public.sos_requests FOR SELECT TO authenticated USING (auth.uid() = user_id); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Citizens can cancel own active SOS" ON public.sos_requests FOR UPDATE TO authenticated USING (auth.uid() = user_id AND status = 'active') WITH CHECK (auth.uid() = user_id); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Coordinators view state SOS" ON public.sos_requests FOR SELECT TO authenticated USING ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'coordinator' AND state_id = (SELECT state_id FROM user_profiles WHERE id = auth.uid())); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Coordinators update state SOS" ON public.sos_requests FOR UPDATE TO authenticated USING ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'coordinator' AND state_id = (SELECT state_id FROM user_profiles WHERE id = auth.uid())) WITH CHECK ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'coordinator'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Admins have full SOS access" ON public.sos_requests FOR ALL TO authenticated USING ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'admin') WITH CHECK ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'admin'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Responders read SOS" ON public.sos_requests FOR SELECT TO authenticated USING ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'responder'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Responders resolve SOS" ON public.sos_requests FOR UPDATE TO authenticated USING ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'responder') WITH CHECK ((SELECT role FROM user_profiles WHERE id = auth.uid()) = 'responder'); EXCEPTION WHEN duplicate_object THEN null; END $$;
+DO $$ BEGIN CREATE POLICY "Service role bypass SOS" ON public.sos_requests FOR ALL TO service_role USING (true) WITH CHECK (true); EXCEPTION WHEN duplicate_object THEN null; END $$;
+
+-- ============================================================================
+-- FUNCTION: get_nearest_safe_zones
+-- ============================================================================
+CREATE OR REPLACE FUNCTION get_nearest_safe_zones(
+  p_latitude  FLOAT,
+  p_longitude FLOAT,
+  p_limit     INT DEFAULT 5
+)
+RETURNS TABLE (
+  id              UUID,
+  name            TEXT,
+  type            TEXT,
+  status          TEXT,
+  quantity        INT,
+  contact         TEXT,
+  notes           TEXT,
+  latitude        FLOAT,
+  longitude       FLOAT,
+  distance_meters FLOAT,
+  state_id        UUID
+)
+LANGUAGE plpgsql
+STABLE
+AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    r.id,
+    r.name,
+    r.type,
+    r.status,
+    r.quantity,
+    r.contact,
+    r.notes,
+    ST_Y(r.location::geometry)::FLOAT  AS latitude,
+    ST_X(r.location::geometry)::FLOAT  AS longitude,
+    ST_Distance(
+      r.location,
+      ST_SetSRID(ST_MakePoint(p_longitude, p_latitude), 4326)::geography
+    )::FLOAT AS distance_meters,
+    r.state_id
+  FROM resources r
+  WHERE
+    r.type IN ('shelter', 'hospital', 'relief_camp', 'medical', 'food', 'rescue')
+    AND r.status = 'available'
+    AND r.quantity > 0
+  ORDER BY distance_meters ASC
+  LIMIT p_limit;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION get_nearest_safe_zones(FLOAT, FLOAT, INT) TO authenticated, service_role, anon;
+
 -- ============================================================================
 -- REALTIME
 -- ============================================================================
@@ -374,6 +485,7 @@ DO $$
 BEGIN
   BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.events; EXCEPTION WHEN duplicate_object THEN null; END;
   BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.alerts; EXCEPTION WHEN duplicate_object THEN null; END;
+  BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.sos_requests; EXCEPTION WHEN duplicate_object THEN null; END;
 END $$;
 
 -- ============================================================================

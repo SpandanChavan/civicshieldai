@@ -60,14 +60,18 @@ router.get('/:id', async (req, res) => {
 });
 
 // ── POST /api/alerts/subscribe ────────────────────────
+const SubscribeSchema = z.object({
+  endpoint: z.string().url(),
+  keys: z.object({ p256dh: z.string(), auth: z.string() }),
+  device_info: z.any().optional()
+});
+
 router.post('/subscribe', async (req, res) => {
-  const subscription = req.body;
-  // B5 FIX: validate the full PushSubscription shape from the browser
-  if (!subscription || !subscription.endpoint || !subscription.keys?.p256dh || !subscription.keys?.auth) {
-    return res.status(400).json({
-      error: 'Invalid subscription object. Expected { endpoint, keys: { p256dh, auth } }'
-    });
+  const parsed = SubscribeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Invalid subscription object.', details: parsed.error.errors });
   }
+  const subscription = parsed.data;
 
   try {
     const db = getDb();

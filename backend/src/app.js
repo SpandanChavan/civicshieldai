@@ -79,6 +79,7 @@ app.use('/api/alerts',    require('./routes/alerts'));
 app.use('/api/resources', require('./routes/resources'));
 app.use('/api/incidents', require('./routes/incidents'));
 app.use('/api/predictions', require('./routes/predictions'));
+app.use('/api/sos', require('./routes/sos'));
 app.use('/api/states', statesRoutes);
 app.use('/api/admin', adminRoutes);
 
@@ -163,6 +164,7 @@ io.on('connection', (socket) => {
   socket.join('public');                          // all clients
   if (role)    socket.join(`role:${role}`);       // e.g. role:coordinator
   if (stateId) socket.join(`state:${stateId}`);   // e.g. state:<uuid>
+  if (socket.userId) socket.join(`user:${socket.userId}`); // e.g. user:<uuid>
 
   socket.on('disconnect', () => {
     console.log(`[Socket] Client disconnected: ${socket.id}`);

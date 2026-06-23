@@ -7,6 +7,7 @@ const router = express.Router();
 
 const IncidentSchema = z.object({
   description: z.string().min(10).max(2000),
+  category: z.string().optional(),
   location: z.object({
     lat: z.number().min(-90).max(90),
     lon: z.number().min(-180).max(180),
@@ -139,6 +140,10 @@ router.post('/', incidentLimiter, async (req, res) => {
     });
 
     res.status(201).json({ data });
+
+    if (finalStateId && req.app.get('io')) {
+      req.app.get('io').to(`state:${finalStateId}`).emit('new_incident', data);
+    }
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -146,17 +151,65 @@ router.post('/', incidentLimiter, async (req, res) => {
 
 // ── PATCH /api/incidents/:id/approve ─────────────────
 // Coordinator approves a report. Optionally creates an official alert.
+const ApproveSchema = z.object({
+  event_type: z.string(),
+  severity: z.enum(['Low', 'Medium', 'High', 'Critical']).optional().default('Medium')
+});
+
 router.patch('/:id/approve', async (req, res) => {
+  const parsed = ApproveSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
+  }
+
   if (req.userRole !== 'coordinator' && req.userRole !== 'admin') {
     return res.status(403).json({ error: 'Coordinators only' });
   }
+
   try {
-    const { data, error } = await getDb()
+    const db = getDb();
+    const { event_type, severity } = parsed.data;
+
+    const { data: incident, error: fetchError } = await db
+      .from('incident_reports')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+    
+    if (fetchError || !incident) {
+      return res.status(404).json({ error: 'Incident not found' });
+    }
+
+    if (req.userRole === 'coordinator' && incident.state_id !== req.userStateId) {
+      return res.status(403).json({ error: 'Forbidden: Incident belongs to another state' });
+    }
+
+    // Insert into events table
+    const { data: newEvent, error: eventError } = await db
+      .from('events')
+      .insert({
+        title: incident.category ? incident.category.replace('_', ' ').toUpperCase() : 'INCIDENT',
+        description: incident.description,
+        event_type: event_type,
+        location: incident.location,
+        severity: severity,
+        state_id: incident.state_id,
+        source: 'citizen_report',
+        is_active: true
+      })
+      .select()
+      .single();
+
+    if (eventError) throw eventError;
+
+    // Update incident report
+    const { data, error } = await db
       .from('incident_reports')
       .update({
         status: 'approved',
         reviewer_id: req.userId,
         reviewed_at: new Date().toISOString(),
+        event_id: newEvent.id
       })
       .eq('id', req.params.id)
       .select()
@@ -171,14 +224,30 @@ router.patch('/:id/approve', async (req, res) => {
 });
 
 // ── PATCH /api/incidents/:id/reject ──────────────────
+const RejectSchema = z.object({
+  reason: z.string().min(5, "A rejection reason of at least 5 characters is required"),
+});
+
 router.patch('/:id/reject', async (req, res) => {
   if (req.userRole !== 'coordinator' && req.userRole !== 'admin') {
     return res.status(403).json({ error: 'Coordinators only' });
   }
-  const { reason } = req.body;
-  if (!reason || reason.trim().length < 5) {
-    return res.status(400).json({ error: 'A rejection reason of at least 5 characters is required' });
+
+  if (req.userRole === 'coordinator') {
+    const { data: incident } = await getDb()
+      .from('incident_reports')
+      .select('state_id')
+      .eq('id', req.params.id)
+      .single();
+    if (!incident || incident.state_id !== req.userStateId) {
+      return res.status(403).json({ error: 'Forbidden: Incident belongs to another state' });
+    }
   }
+  const parsed = RejectSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
+  }
+  const { reason } = parsed.data;
   try {
     const { data, error } = await getDb()
       .from('incident_reports')
@@ -202,6 +271,12 @@ router.patch('/:id/reject', async (req, res) => {
 
 // ── PATCH /api/incidents/:id/status (legacy) ──────────
 // B8 FIX: require coordinator or admin role
+const StatusSchema = z.object({
+  status: z.enum(['pending_review', 'under_review', 'approved', 'rejected', 'resolved'], {
+    errorMap: () => ({ message: "Invalid status. Must be one of: pending_review, under_review, approved, rejected, resolved" })
+  }),
+});
+
 router.patch('/:id/status', async (req, res) => {
   if (!req.userId) {
     return res.status(401).json({ error: 'Authentication required' });
@@ -209,11 +284,23 @@ router.patch('/:id/status', async (req, res) => {
   if (req.userRole !== 'coordinator' && req.userRole !== 'admin') {
     return res.status(403).json({ error: 'Forbidden: Coordinators and admins only' });
   }
-  const { status } = req.body;
-  const VALID = ['pending_review', 'under_review', 'approved', 'rejected', 'resolved'];
-  if (!VALID.includes(status)) {
-    return res.status(400).json({ error: `Invalid status. Must be one of: ${VALID.join(', ')}` });
+
+  if (req.userRole === 'coordinator') {
+    const { data: incident } = await getDb()
+      .from('incident_reports')
+      .select('state_id')
+      .eq('id', req.params.id)
+      .single();
+    if (!incident || incident.state_id !== req.userStateId) {
+      return res.status(403).json({ error: 'Forbidden: Incident belongs to another state' });
+    }
   }
+  
+  const parsed = StatusSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
+  }
+  const { status } = parsed.data;
   try {
     const { data, error } = await getDb()
       .from('incident_reports')

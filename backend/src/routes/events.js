@@ -136,7 +136,14 @@ router.get('/:id', async (req, res) => {
 });
 
 // ── PATCH /api/events/:id/deactivate ─────────────────
+const DeactivateSchema = z.object({}).strict();
+
 router.patch('/:id/deactivate', async (req, res) => {
+  const parsed = DeactivateSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
+
+  if (!req.userId) return res.status(401).json({ error: 'Authentication required' });
+  if (req.userRole !== 'coordinator' && req.userRole !== 'admin') return res.status(403).json({ error: 'Forbidden' });
   try {
     const { data, error } = await getDb()
       .from('events')

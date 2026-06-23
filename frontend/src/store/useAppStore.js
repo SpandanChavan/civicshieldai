@@ -35,6 +35,12 @@ const useAppStore = create((set, get) => ({
   addIncident: (incident) =>
     set((state) => ({ incidents: [incident, ...state.incidents] })),
 
+  // ── SOS Emergency ─────────────────────────────────────
+  activeSos: null,
+  coordinatorSosQueue: [],
+  setActiveSos: (sos) => set({ activeSos: sos }),
+  setCoordinatorSosQueue: (queue) => set({ coordinatorSosQueue: queue }),
+
   // ── Map State ───────────────────────────────────────
   selectedEvent: null,
   setSelectedEvent: (event) => set({ selectedEvent: event }),

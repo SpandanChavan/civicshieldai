@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { backendApi } from '@/services/backendApi';
 import { useAuth } from '@/hooks/useAuth';
+import useAppStore from '@/store/useAppStore';
 import { Clock, Search, CheckCircle2, XCircle, Check, ClipboardList, MapPin, User, CheckCircle, X } from 'lucide-react';
 
 const STATUS_STYLES = {
@@ -45,10 +46,64 @@ function RejectModal({ report, onClose, onReject }) {
   );
 }
 
+function ApproveModal({ report, onClose, onApprove }) {
+  const [eventType, setEventType] = useState(report.category || 'flood');
+  const [severity, setSeverity] = useState('Medium');
+
+  const CATEGORIES = ['flood', 'fire', 'earthquake_damage', 'missing_person', 'road_blockage', 'medical_emergency', 'infrastructure_damage', 'landslide', 'cyclone', 'heatwave', 'other'];
+  const SEVERITIES = ['Low', 'Medium', 'High', 'Critical'];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)' }}>
+      <div className="w-full max-w-md rounded-2xl p-6 space-y-4" style={{ background: '#1a1b2e', border: '1px solid rgba(16,185,129,0.3)' }}>
+        <h3 className="text-white font-bold text-lg flex items-center gap-2"><CheckCircle2 className="text-emerald-500" size={20} /> Approve Report</h3>
+        <p className="text-slate-400 text-sm truncate">"{report.description?.slice(0, 80)}…"</p>
+        
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Event Type *</label>
+            <select
+              className="mt-1.5 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 appearance-none"
+              value={eventType}
+              onChange={(e) => setEventType(e.target.value)}
+            >
+              {CATEGORIES.map(c => <option key={c} value={c} className="bg-slate-800">{c.replace('_', ' ')}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Severity *</label>
+            <select
+              className="mt-1.5 w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 appearance-none"
+              value={severity}
+              onChange={(e) => setSeverity(e.target.value)}
+            >
+              {SEVERITIES.map(s => <option key={s} value={s} className="bg-slate-800">{s}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex gap-3 pt-2">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl text-sm font-medium text-slate-400 border border-white/10 hover:bg-white/5">
+            Cancel
+          </button>
+          <button
+            onClick={() => onApprove({ event_type: eventType, severity })}
+            className="flex-1 py-2.5 rounded-xl text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-500"
+          >
+            Confirm Approve
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ReportsQueue() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
+  const addNotification = useAppStore(state => state.addNotification);
   const [rejectTarget, setRejectTarget] = useState(null);
+  const [approveTarget, setApproveTarget] = useState(null);
   const [filter, setFilter] = useState('pending_review');
 
   const stateName = profile?.states?.name;
@@ -63,10 +118,18 @@ export default function ReportsQueue() {
   const reports = data?.data || [];
 
   const approveMutation = useMutation({
-    mutationFn: (id) => backendApi.patch(`/incidents/${id}/approve`),
+    mutationFn: ({ id, payload }) => backendApi.patch(`/incidents/${id}/approve`, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['incidents'] });
+      setApproveTarget(null);
     },
+    onError: (err) => {
+      addNotification({ 
+        title: 'Approval Failed', 
+        message: err.response?.data?.error || err.message, 
+        type: 'error' 
+      });
+    }
   });
 
   const rejectMutation = useMutation({
@@ -75,6 +138,13 @@ export default function ReportsQueue() {
       queryClient.invalidateQueries({ queryKey: ['incidents'] });
       setRejectTarget(null);
     },
+    onError: (err) => {
+      addNotification({ 
+        title: 'Rejection Failed', 
+        message: err.response?.data?.error || err.message, 
+        type: 'error' 
+      });
+    }
   });
 
   const pendingCount = reports.filter(r => r.status === 'pending_review').length;
@@ -148,6 +218,13 @@ export default function ReportsQueue() {
                   {report.description?.slice(0, 150)}{report.description?.length > 150 ? '…' : ''}
                 </p>
 
+                {/* Media Preview */}
+                {report.media_urls?.length > 0 && (
+                  <div className="w-full h-32 rounded-lg overflow-hidden border border-white/10 mt-2">
+                    <img src={report.media_urls[0]} alt="Incident media" className="w-full h-full object-cover" />
+                  </div>
+                )}
+
                 {/* Reporter info */}
                 {(report.reporter_name || report.reporter_contact) && (
                   <p className="text-[10px] text-slate-500 flex items-center gap-1">
@@ -167,7 +244,7 @@ export default function ReportsQueue() {
                   <div className="flex gap-2 pt-1">
                     <button
                       id={`approve-report-${report.id}`}
-                      onClick={() => approveMutation.mutate(report.id)}
+                      onClick={() => setApproveTarget(report)}
                       disabled={approveMutation.isPending}
                       className="flex-1 py-2 flex items-center justify-center gap-1 rounded-lg text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 disabled:opacity-50 transition-all"
                     >
@@ -194,6 +271,15 @@ export default function ReportsQueue() {
           report={rejectTarget}
           onClose={() => setRejectTarget(null)}
           onReject={(reason) => rejectMutation.mutate({ id: rejectTarget.id, reason })}
+        />
+      )}
+
+      {/* Approve modal */}
+      {approveTarget && (
+        <ApproveModal
+          report={approveTarget}
+          onClose={() => setApproveTarget(null)}
+          onApprove={(payload) => approveMutation.mutate({ id: approveTarget.id, payload })}
         />
       )}
     </div>
