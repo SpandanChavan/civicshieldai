@@ -37,9 +37,16 @@ const useAppStore = create((set, get) => ({
 
   // ── SOS Emergency ─────────────────────────────────────
   activeSos: null,
-  coordinatorSosQueue: [],
+  nearestZones: [],
+  sosRequests: [],
   setActiveSos: (sos) => set({ activeSos: sos }),
-  setCoordinatorSosQueue: (queue) => set({ coordinatorSosQueue: queue }),
+  setNearestZones: (zones) => set({ nearestZones: zones }),
+  clearActiveSos: () => set({ activeSos: null, nearestZones: [] }),
+  setSosRequests: (requests) => set({ sosRequests: requests }),
+  addIncomingSos: (sos) => set((state) => ({ sosRequests: [sos, ...state.sosRequests] })),
+  updateSosStatus: (id, status) => set((state) => ({
+    sosRequests: state.sosRequests.map(s => s.id === id ? { ...s, status } : s)
+  })),
 
   // ── Map State ───────────────────────────────────────
   selectedEvent: null,
