@@ -1,8 +1,152 @@
 # CivicShield AI — Next-Phase Workplan
 
 **Author:** Project Manager
-**Date:** 2026-06-21
+**Date:** 2026-06-21 (immediate section added 2026-06-23)
 **Status of project:** Round-3 review fixes verified; code is being pushed. Core platform works against the live Supabase instance. This plan takes us from "works on our one cloud DB" to "production-grade, reproducible, and feature-complete."
+
+> **Note on sequencing:** the section immediately below ("Immediate — Pre-Demo Workplan") is feature
+> work needed before tomorrow's mentor demo and takes priority over everything else in this document.
+> The "Guiding objectives" section and beyond is the production-hardening roadmap (including P2-8) and
+> stays **parked** until after the demo, per standing instruction.
+
+---
+
+## Immediate — Pre-Demo Workplan
+
+Everything in this section was verified directly against the current code (file + line references
+given) before being written down — not taken from any engineer report at face value.
+
+### Step 0 — Outstanding verification (blocking, do first)
+
+These were asked for in earlier rounds and never confirmed with real output. Until answered, "it's
+working" is not accepted.
+
+1. **API health.** Run and paste the raw output (not a summary):
+   ```
+   curl http://localhost:4000/health
+   curl http://localhost:4000/api/events
+   curl http://localhost:4000/api/incidents
+   curl http://localhost:4000/api/alerts
+   curl http://localhost:8000/docs -o /dev/null -w "%{http_code}\n"
+   ```
+2. **Migration tracking.** Paste real output of `npx supabase migration list --local`. Migrations 012
+   and 013 were applied via raw `docker exec ... psql` — confirm Supabase's own
+   `supabase_migrations.schema_migrations` table actually knows about them. If it doesn't, re-apply them
+   properly through `supabase migration up` before anything else lands on top.
+3. **PR status.** Paste the real PR number/URL from the GitHub web UI (not a "create new PR" link
+   template) for `feature/p2-tickets-rescued` → `main`.
+
+### Step 1 — Approve → Map pipeline (mostly done, needs evidence only)
+
+**Status: implemented, independently verified in code, not yet evidence-confirmed live.**
+
+The feature requested — "approved report shows on the map, coordinator picks the disaster type" — is
+already built:
+
+- `frontend/src/components/dashboard/ReportsQueue.jsx:49-99` — `ApproveModal` lets the coordinator pick
+  `event_type` (defaults to the citizen's own `category`) and `severity` before confirming.
+- `backend/src/routes/incidents.js:151-224` — `PATCH /:id/approve` validates `{event_type, severity}`
+  via `ApproveSchema`, inserts a real row into `events` (columns match `schema.sql:105-122` exactly:
+  `source, event_type, severity, title, description, location, is_active, created_by, state_id`), then
+  sets `incident_reports.event_id` to link back to it. The state-ownership check is present.
+- `backend/src/routes/incidents.js:280-297` — `PATCH /:id/status` (the legacy route) now also has the
+  same state-ownership check. This closes that open item from last round.
+
+**One real risk not yet tested:** the `events` insert does `location: incident.location`, reusing
+whatever format Supabase's REST client returned for the GEOGRAPHY column (typically WKB hex, not the
+`SRID=4326;POINT(...)` string format used elsewhere in this same file). Postgres should accept WKB hex
+into a GEOGRAPHY column directly, so this is likely fine — but "likely fine" is not "verified."
+
+**Ticket P1-MAP — evidence required.** Approve a real pending report through the UI, picking a
+non-default event type. Provide: a screenshot of the new marker appearing on the map **without a
+manual page reload**, the actual `events` row created (id, event_type, severity, real lat/lon — not
+nulls), and confirmation `incident_reports.event_id` now points at it. If the marker needs a manual
+refresh to appear, that's a bug to fix, not something to route around.
+
+### Step 2 — SOS Emergency Feature
+
+`SOS_FEATURE_IMPLEMENTATION.md` in the repo root is a complete build guide for this feature and is
+mostly usable as-is. I cross-checked it against the actual current code and found three concrete bugs
+in the guide itself. **Do not copy-paste these three sections verbatim — use the corrections below.**
+
+**Correction 1 — migration numbering collision.** The guide creates
+`supabase/migrations/010_sos_system.sql`. That number is taken — `010_secure_rls_grants.sql` already
+exists and the repo is up to `013_incident_media_bucket.sql`. Create the SOS migration as
+**`014_sos_system.sql`** instead, with the helper function appended to the same file (skip the separate
+`010b` file from the guide).
+
+**Correction 2 — `notificationRouter.routeAlert()` call signature is wrong in the guide.** The guide's
+`sos.js` SMS step calls `routeAlert({title, body}, ['sms'], [contact.phone])` — a bare array as the
+third argument. I read the real implementation at `backend/src/services/notificationRouter.js:258-268`:
+it expects `recipients` to be an **object** with an `smsNumbers` array property
+(`recipients.smsNumbers?.length > 0`). Passing a bare array means `recipients.smsNumbers` is
+`undefined`, the check is false, and **no SMS is ever sent — silently, with no error**. Fix:
+```js
+await notificationRouter.routeAlert(
+  { title: `SOS from ${senderName}`, body: smsBody, severity: 'Critical' },
+  ['sms'],
+  { smsNumbers: emergencyContacts.map(c => c.phone).filter(Boolean) }
+);
+```
+(one call covering all contacts — `routeAlert` already loops internally; don't loop again in `sos.js`.)
+
+**Correction 3 — socket property names don't match this codebase.** The guide assumes
+`socket.data.userId` / `socket.data.role` / `socket.data.stateId`. I read
+`backend/src/app.js:124-170` — this codebase sets **`socket.userId`, `socket.userRole`,
+`socket.userStateId`** directly on the socket object, not under `.data`. Use the existing convention —
+just add one line to the existing connection handler:
+```js
+io.on('connection', (socket) => {
+  const role    = socket.userRole;
+  const stateId = socket.userStateId;
+  socket.join('public');
+  if (role)    socket.join(`role:${role}`);
+  if (stateId) socket.join(`state:${stateId}`);
+  if (socket.userId) socket.join(`user:${socket.userId}`);   // ← only new line needed
+  socket.on('disconnect', () => { ... });
+});
+```
+Also: this codebase does not attach `req.io` via middleware — every existing route (e.g.
+`incidents.js:143-144`) emits via `req.app.get('io')`. Use `req.app.get('io')` in the new `sos.js` too;
+don't add a parallel `req.io` middleware just for this feature.
+
+**Sequenced tickets:**
+
+| # | Ticket | File(s) | Depends on |
+|---|--------|---------|------------|
+| S1 | Pre-flight checklist | — | Confirm Twilio env vars set; `resources` table has ≥1 seeded `shelter`/`hospital` row with `status='available'`, `quantity>0`; `get_state_from_point` works in the SQL editor |
+| S2 | Migration `014_sos_system.sql` | new file | Apply via real `supabase migration up` — not raw `docker exec psql` |
+| S3 | `backend/src/routes/sos.js` | new file | S2; apply Corrections 2 & 3 while writing it |
+| S4 | Mount route + one-line socket room join | `backend/src/app.js` | S3; apply Correction 3 exactly — don't restructure the existing `io.use` block |
+| S5 | `sosApi` additions | `frontend/src/services/backendApi.js` | S4; follow the existing axios pattern already in this file (`backendApi.patch(...)` etc.) — the guide's `apiRequest()` helper doesn't exist here |
+| S6 | Zustand store additions | `frontend/src/store/useAppStore.js` | S5 |
+| S7 | `SOSButton.jsx`, `NearestSafeZones.jsx`, `SOSStatusBanner.jsx` | new `frontend/src/components/sos/` | S6 |
+| S8 | `EmergencyContactsEditor.jsx` + wire into citizen portal | `frontend/src/pages/CitizenPortal.jsx` | S7; `useAuth.jsx` profile select must include `emergency_contacts` |
+| S9 | `SOSAlertPanel.jsx` + wire into coordinator dashboard | `frontend/src/pages/CoordinatorDashboard.jsx` | S7 |
+| S10 | `schema.sql` sync | `supabase/schema.sql` | S2; run `scripts/check_drift.sh` after — this exact class of bug (text mismatch) has already bitten this project twice |
+| S11 | End-to-end two-browser test | — | S1–S10; evidence: screenshot of SOS appearing in the coordinator panel in real time, status banner updating on the citizen side without refresh, confirmation an SMS was actually received |
+
+**Known, accepted v1 limitations (do not gold-plate now):** no offline support, resource data is only
+as fresh as coordinators enter it, no escalation timeout if nobody acknowledges, SMS costs money per
+send, no audio alert file yet.
+
+### Prompt for the engineer (Immediate section)
+
+**Do:**
+- Step 0 first — paste real `curl` output, real `supabase migration list --local` output, and a real
+  PR number. No summaries, no "should work."
+- For Step 1, just produce the evidence listed — the code is already correct, don't re-implement it.
+- For Step 2, build from the guide but apply all three corrections above exactly as written.
+- Run `scripts/check_drift.sh` after touching `schema.sql`, every time.
+- Push to `origin` immediately after every commit, given the recurring local git corruption.
+
+**Don't:**
+- Don't claim something "should work" or "is fixed" without pasting actual command output or a
+  screenshot — every unverified claim gets re-checked against the code directly.
+- Don't apply migrations via raw `docker exec psql` again.
+- Don't copy the SOS guide's `sos.js` SMS call or socket-room code verbatim — both contain real bugs,
+  documented above.
+- Don't touch P2-8 or anything below this section — still parked until after the demo.
 
 ---
 
