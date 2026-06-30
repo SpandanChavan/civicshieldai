@@ -11,6 +11,7 @@ import MonsoonDashboard from '@/components/dashboard/MonsoonDashboard';
 import MisinformationPanel from '@/components/dashboard/MisinformationPanel';
 import ReportsQueue from '@/components/dashboard/ReportsQueue';
 import AlertLogsDrawer from '@/components/alerts/AlertLogsDrawer';
+import IngestionHealthPanel from '@/components/dashboard/IngestionHealthPanel';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EmptyState from '@/components/shared/EmptyState';
 import SOSAlertPanel from '@/components/sos/SOSAlertPanel';
@@ -19,7 +20,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ClipboardList, Map as MapIcon, Bell, Truck, CloudRain, 
   ShieldAlert, ShieldCheck, Activity, AlertTriangle, Send,
-  ChevronLeft, LayoutGrid, Building2
+  ChevronLeft, LayoutGrid, Building2, Signal
 } from 'lucide-react';
 
 const PANELS = [
@@ -30,6 +31,7 @@ const PANELS = [
   { id: 'monsoon',   icon: CloudRain,     label: 'Monsoon',      color: 'text-cyan-400',   bg: 'bg-cyan-500/10',   border: 'border-cyan-500/20' },
   { id: 'ndrf',      icon: ShieldAlert,   label: 'NDRF',         color: 'text-emerald-400',bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
   { id: 'misinfo',   icon: ShieldCheck,   label: 'Fact-Check',   color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20' },
+  { id: 'health',    icon: Signal,        label: 'Feed Health',  color: 'text-teal-400',   bg: 'bg-teal-500/10',   border: 'border-teal-500/20' },
 ];
 
 export default function CoordinatorDashboard({ compact = false, selectedMapEvent, onClearMapEvent }) {
@@ -140,6 +142,7 @@ export default function CoordinatorDashboard({ compact = false, selectedMapEvent
       case 'monsoon':   return <MonsoonDashboard />;
       case 'ndrf':      return <NDRFPanel />;
       case 'misinfo':   return <MisinformationPanel />;
+      case 'health':    return <div className="p-4"><IngestionHealthPanel /></div>;
       default:          return null;
     }
   };

@@ -12,6 +12,11 @@ const { routeAlert } = require('../services/notificationRouter');
 // India bounding box — events inside this bbox are handled by NCS (m5 dedup fix)
 const INDIA_BBOX = { minLat: 6, maxLat: 38, minLon: 68, maxLon: 98 };
 
+// ── B1: In-memory ingestion health tracker ───────────
+// Keyed by eventType (e.g. 'Earthquake', 'NCS-Earthquake', 'India').
+// Reset on backend restart — intentionally ephemeral (no DB writes).
+const cronHealth = {};
+
 function isInIndia(lat, lon) {
   return lat >= INDIA_BBOX.minLat && lat <= INDIA_BBOX.maxLat &&
          lon >= INDIA_BBOX.minLon && lon <= INDIA_BBOX.maxLon;
@@ -60,10 +65,18 @@ async function upsertEvents(events, io, eventType) {
 
   if (error) {
     console.error(`[Cron] Upsert error for ${eventType}:`, error.message);
+    cronHealth[eventType] = { ...cronHealth[eventType], lastError: error.message, lastErrorAt: new Date().toISOString() };
     return;
   }
 
-  console.log(`[Cron] ${eventType}: upserted ${data?.length || 0} events`);
+  const count = data?.length || 0;
+  cronHealth[eventType] = {
+    lastRun: new Date().toISOString(),
+    lastCount: count,
+    lastError: null,
+    lastErrorAt: cronHealth[eventType]?.lastErrorAt || null,
+  };
+  console.log(`[Cron] ${eventType}: upserted ${count} events`);
   // M3 FIX: emit to 'public' room (all clients) instead of io.emit (no room scoping)
   io.to('public').emit('events:updated', { type: eventType, count: data?.length || 0 });
 
@@ -294,4 +307,16 @@ function startCronJobs(io) {
   // }
 }
 
-module.exports = { startCronJobs, upsertEvents };
+/**
+ * B1: Return current ingestion health snapshot.
+ * Called by GET /api/events/ingestion-health.
+ */
+function getIngestionHealth() {
+  const sources = ['Earthquake', 'Wildfire', 'GDACS', 'EONET', 'India', 'IMD', 'NCS-Earthquake', 'CWC-Flood'];
+  return sources.map(source => ({
+    source,
+    ...( cronHealth[source] || { lastRun: null, lastCount: 0, lastError: null, lastErrorAt: null } ),
+  }));
+}
+
+module.exports = { startCronJobs, upsertEvents, getIngestionHealth };
