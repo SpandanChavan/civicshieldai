@@ -1,4 +1,5 @@
 const cron = require('node-cron');
+const axios = require('axios');
 const { getAdminDb } = require('../lib/db');
 const { fetchEarthquakes } = require('../services/usgsEarthquake');
 const { fetchFireHotspots } = require('../services/nasaFirms');
@@ -16,6 +17,33 @@ const INDIA_BBOX = { minLat: 6, maxLat: 38, minLon: 68, maxLon: 98 };
 // Keyed by eventType (e.g. 'Earthquake', 'NCS-Earthquake', 'India').
 // Reset on backend restart — intentionally ephemeral (no DB writes).
 const cronHealth = {};
+
+// ── C2: ML Severity Calibration ──────────────────────
+// Calls POST /classify/severity on the local ML service.
+// Only overrides source severity when ML confidence > 0.80 and result differs.
+// Degrades silently (returns null) if ML is unreachable or misconfigured.
+const ML_SEVERITY_URL = `${process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000'}/classify/severity`;
+
+async function calibrateSeverity(event) {
+  try {
+    const payload = {
+      event_type: event.event_type || 'Unknown',
+      magnitude:  event.raw_data?.mag        ?? event.raw_data?.magnitude ?? null,
+      frp:        event.raw_data?.frp        ?? event.raw_data?.bright_t31 ?? null,
+      wind_speed: event.raw_data?.wind_speed ?? null,
+      precipitation: event.raw_data?.precipitation ?? null,
+      area_affected_km2: event.raw_data?.area_km2 ?? null,
+      population_density: event.raw_data?.pop_density ?? null,
+    };
+    const { data } = await axios.post(ML_SEVERITY_URL, payload, { timeout: 3000 });
+    if (data?.confidence >= 0.80 && data?.severity && data.severity !== event.severity) {
+      return data.severity;
+    }
+  } catch (_) {
+    // ML service unavailable — degrade silently
+  }
+  return null;
+}
 
 function isInIndia(lat, lon) {
   return lat >= INDIA_BBOX.minLat && lat <= INDIA_BBOX.maxLat &&
@@ -45,12 +73,15 @@ async function upsertEvents(events, io, eventType) {
     return state_id;
   }
 
-  // Format location as WKT POINT for PostGIS and resolve state_id (N2 FIX)
+  // Format location as WKT POINT for PostGIS, resolve state_id (N2),
+  // and calibrate severity via ML service (C2 — degrades gracefully)
   const formatted = [];
   for (const e of events) {
     const state_id = e.location ? await resolveStateId(e.location.lat, e.location.lon) : null;
+    const mlSeverity = await calibrateSeverity(e);
     formatted.push({
       ...e,
+      severity: mlSeverity || e.severity,
       state_id,
       location: e.location
         ? `SRID=4326;POINT(${e.location.lon} ${e.location.lat})`
