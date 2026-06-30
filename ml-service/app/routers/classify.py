@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 from app.services.sklearn_service import classify_severity, detect_misinformation
+from app.services.vision_service import classify_image_url
 
 router = APIRouter()
 
@@ -55,3 +56,18 @@ def classify_misinformation(req: MisinfoRequest):
         return detect_misinformation(req.text, req.source)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class ImageRequest(BaseModel):
+    image_url: str
+
+
+@router.post("/image")
+async def classify_incident_image(req: ImageRequest):
+    """
+    AI Incident Photo Classifier (E1).
+    Classifies an incident photo via the HuggingFace Inference API and returns a
+    suggested damage type + severity. Degrades gracefully (available=False) when
+    HF_API_TOKEN is unset or the upstream is unavailable — never errors out.
+    """
+    return await classify_image_url(req.image_url)

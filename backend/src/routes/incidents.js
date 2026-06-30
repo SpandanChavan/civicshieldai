@@ -1,4 +1,5 @@
 const express = require('express');
+const axios = require('axios');
 const { z } = require('zod');
 const rateLimit = require('express-rate-limit');
 const { logAudit } = require('../utils/auditLogger');
@@ -144,6 +145,39 @@ router.post('/', incidentLimiter, async (req, res) => {
     if (finalStateId && req.app.get('io')) {
       req.app.get('io').to(`state:${finalStateId}`).emit('new_incident', data);
     }
+
+    // ── E1: AI photo classification (best-effort, non-blocking) ──────────────
+    // Response is already sent; this runs in the background and never affects
+    // the citizen's submit. Stores the ML vision result on the report so the
+    // coordinator review queue can show a suggested severity.
+    const imageUrl = Array.isArray(data.media_urls) ? data.media_urls[0] : null;
+    if (imageUrl) {
+      (async () => {
+        try {
+          const ML = process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000';
+          const { data: cls } = await axios.post(
+            `${ML}/classify/image`,
+            { image_url: imageUrl },
+            { timeout: 25000 }
+          );
+          if (cls && cls.available) {
+            await getDb()
+              .from('incident_reports')
+              .update({ ai_classification: cls })
+              .eq('id', data.id);
+            // Notify the coordinator room so the queue updates live
+            if (finalStateId && req.app.get('io')) {
+              req.app.get('io').to(`state:${finalStateId}`).emit('incident_classified', {
+                id: data.id,
+                ai_classification: cls,
+              });
+            }
+          }
+        } catch (err) {
+          console.warn('[Incidents] AI image classification skipped:', err.message);
+        }
+      })();
+    }
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
@@ -185,13 +219,22 @@ router.patch('/:id/approve', async (req, res) => {
     }
 
     // Insert into events table
+    let newLocation = incident.location;
+    if (typeof incident.location === 'string') {
+      const { parseWkbPoint } = require('../utils/geoHelpers');
+      const parsed = parseWkbPoint(incident.location);
+      if (parsed) {
+        newLocation = `SRID=4326;POINT(${parsed.lon} ${parsed.lat})`;
+      }
+    }
+
     const { data: newEvent, error: eventError } = await db
       .from('events')
       .insert({
         title: incident.category ? incident.category.replace('_', ' ').toUpperCase() : 'INCIDENT',
         description: incident.description,
         event_type: event_type,
-        location: incident.location,
+        location: newLocation,
         severity: severity,
         state_id: incident.state_id,
         source: 'citizen_report',

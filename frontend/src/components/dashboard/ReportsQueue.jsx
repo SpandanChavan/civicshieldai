@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { backendApi } from '@/services/backendApi';
 import { useAuth } from '@/hooks/useAuth';
 import useAppStore from '@/store/useAppStore';
-import { Clock, Search, CheckCircle2, XCircle, Check, ClipboardList, MapPin, User, CheckCircle, X } from 'lucide-react';
+import { Clock, Search, CheckCircle2, XCircle, Check, ClipboardList, MapPin, User, CheckCircle, X, Sparkles } from 'lucide-react';
 
 const STATUS_STYLES = {
   pending_review: { color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/30', label: <span className="flex items-center gap-1"><Clock size={12}/> Pending</span> },
@@ -48,7 +48,8 @@ function RejectModal({ report, onClose, onReject }) {
 
 function ApproveModal({ report, onClose, onApprove }) {
   const [eventType, setEventType] = useState(report.category || 'flood');
-  const [severity, setSeverity] = useState('Medium');
+  // E1: pre-fill severity with the AI photo classifier's suggestion (coordinator can override)
+  const [severity, setSeverity] = useState(report.ai_classification?.suggested_severity || 'Medium');
 
   const CATEGORIES = ['flood', 'fire', 'earthquake_damage', 'missing_person', 'road_blockage', 'medical_emergency', 'infrastructure_damage', 'landslide', 'cyclone', 'heatwave', 'other'];
   const SEVERITIES = ['Low', 'Medium', 'High', 'Critical'];
@@ -222,6 +223,18 @@ export default function ReportsQueue() {
                 {report.media_urls?.length > 0 && (
                   <div className="w-full h-32 rounded-lg overflow-hidden border border-white/10 mt-2">
                     <img src={report.media_urls[0]} alt="Incident media" className="w-full h-full object-cover" />
+                  </div>
+                )}
+
+                {/* AI photo classification (E1) */}
+                {report.ai_classification?.available && (
+                  <div className="flex items-center gap-1.5 text-[10px] rounded px-2 py-1 bg-indigo-500/10 border border-indigo-500/20 text-indigo-300">
+                    <Sparkles size={11} className="flex-shrink-0" />
+                    <span>
+                      AI sees <span className="font-semibold capitalize">{report.ai_classification.damage_type?.replace('_', ' ')}</span>
+                      {' '}· suggests <span className="font-semibold">{report.ai_classification.suggested_severity}</span>
+                      {' '}<span className="text-indigo-400/60">({Math.round((report.ai_classification.confidence || 0) * 100)}%)</span>
+                    </span>
                   </div>
                 )}
 
