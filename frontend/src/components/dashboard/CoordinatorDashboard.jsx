@@ -10,6 +10,7 @@ import NDRFPanel from '@/components/resources/NDRFPanel';
 import MonsoonDashboard from '@/components/dashboard/MonsoonDashboard';
 import MisinformationPanel from '@/components/dashboard/MisinformationPanel';
 import ReportsQueue from '@/components/dashboard/ReportsQueue';
+import AlertLogsDrawer from '@/components/alerts/AlertLogsDrawer';
 import LoadingSpinner from '@/components/shared/LoadingSpinner';
 import EmptyState from '@/components/shared/EmptyState';
 import SOSAlertPanel from '@/components/sos/SOSAlertPanel';
@@ -118,23 +119,13 @@ export default function CoordinatorDashboard({ compact = false, selectedMapEvent
               />
             </div>
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Recent Alerts</h3>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Recent Alerts — click to see delivery logs</h3>
               {alertsLoading ? (
                 <LoadingSpinner size="sm" label="Loading alerts…" />
               ) : (
                 <div className="space-y-2">
                   {alerts.slice(0, 20).map(alert => (
-                    <div key={alert.id} id={`alert-row-${alert.id}`} className="glass-card flex items-center justify-between p-3">
-                      <div>
-                        <p className="text-sm font-medium text-white">{alert.title}</p>
-                        <p className="text-xs text-slate-500 mt-0.5 flex gap-2">
-                          <span className={`severity-${alert.severity?.toLowerCase()}`}>{alert.severity}</span>
-                          <span>·</span>
-                          <span className={alert.status === 'sent' ? 'text-emerald-400' : 'text-amber-400'}>{alert.status}</span>
-                        </p>
-                      </div>
-                      <Send size={14} className="text-slate-600" />
-                    </div>
+                    <AlertLogsDrawer key={alert.id} alert={alert} />
                   ))}
                   {alerts.length === 0 && (
                     <EmptyState type="empty" icon={<Send className="text-slate-500 mx-auto" size={32}/>} title="No alerts sent yet" />
