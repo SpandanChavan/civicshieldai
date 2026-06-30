@@ -2,49 +2,34 @@
  * frontend/src/components/sos/SOSButton.jsx
  *
  * The one-tap SOS button for the CitizenPortal.
- * Handles geolocation, confirmation, submission, and displays the
+ * Handles geolocation, submission, and displays the
  * nearest safe zones + live status banner after submission.
  */
 
 import { useState, useCallback } from 'react';
-import { supabase } from '../../services/supabaseClient';
 import { sosApi } from '../../services/backendApi';
 import useAppStore from '../../store/useAppStore';
 import NearestSafeZones from './NearestSafeZones';
 import SOSStatusBanner from './SOSStatusBanner';
+import { ShieldAlert, AlertTriangle, Loader2, RefreshCcw } from 'lucide-react';
 
 export default function SOSButton() {
-  const [phase, setPhase]         = useState('idle'); // idle | confirming | locating | sending | active | error
+  const [phase, setPhase]         = useState('idle'); // idle | locating | sending | active | error
   const [errorMsg, setErrorMsg]   = useState('');
-  const [message, setMessage]     = useState('');
 
   const { activeSos, setActiveSos, nearestZones, setNearestZones, clearActiveSos } = useAppStore();
 
-  // ── Handle the initial SOS button click ────────────────────────────────────
-  const handleSOSClick = () => {
-    setPhase('confirming');
-    setErrorMsg('');
-  };
-
-  // ── User cancelled the confirmation dialog ─────────────────────────────────
-  const handleCancel = () => {
-    setPhase('idle');
-    setMessage('');
-  };
-
-  // ── User confirmed — get GPS and submit ────────────────────────────────────
-  const handleConfirm = useCallback(async () => {
+  const handleSOSClick = useCallback(async () => {
     setPhase('locating');
     setErrorMsg('');
 
-    // Step 1: Get GPS coordinates
     let latitude, longitude;
     try {
       const position = await new Promise((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
-          timeout:            10000,  // 10 second timeout
-          maximumAge:         0,      // Always fresh position
+          timeout:            10000,
+          maximumAge:         0,
         });
       });
       latitude  = position.coords.latitude;
@@ -58,23 +43,17 @@ export default function SOSButton() {
       return;
     }
 
-    // Step 2: Submit SOS to backend using the sosApi
     setPhase('sending');
     try {
       const data = await sosApi.create({
         latitude,
         longitude,
-        message: message.trim() || null,
       });
 
-      // Success — store SOS and safe zones in Zustand
       setActiveSos(data.sos);
       setNearestZones(data.nearest_safe_zones || []);
       setPhase('active');
-      setMessage('');
-
     } catch (submitErr) {
-      // 409 = already have an active SOS (we'll assume the API throws an Error object with the message)
       if (submitErr.message?.includes('already have an active SOS')) {
         setErrorMsg('You already have an active SOS. See your status below.');
         setPhase('active');
@@ -83,9 +62,8 @@ export default function SOSButton() {
         setPhase('error');
       }
     }
-  }, [message, setActiveSos, setNearestZones]);
+  }, [setActiveSos, setNearestZones]);
 
-  // ── Handle citizen cancelling their own SOS ────────────────────────────────
   const handleCancelSOS = useCallback(async () => {
     if (!activeSos?.id) return;
     try {
@@ -97,17 +75,14 @@ export default function SOSButton() {
     }
   }, [activeSos, clearActiveSos]);
 
-  // ── Retry after error ──────────────────────────────────────────────────────
   const handleRetry = () => {
     setPhase('idle');
     setErrorMsg('');
   };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{ marginBottom: '1.5rem' }}>
+    <div style={{ marginBottom: '1.5rem', fontFamily: "'Inter', sans-serif" }}>
 
-      {/* ── If SOS is active, show status banner and safe zones ── */}
       {(phase === 'active' || activeSos) && (
         <>
           <SOSStatusBanner sos={activeSos} onCancel={handleCancelSOS} />
@@ -115,7 +90,6 @@ export default function SOSButton() {
         </>
       )}
 
-      {/* ── Idle state: show the SOS button ── */}
       {(phase === 'idle' && !activeSos) && (
         <div style={{ textAlign: 'center', padding: '1rem 0' }}>
           <button
@@ -124,133 +98,72 @@ export default function SOSButton() {
               width:           '160px',
               height:          '160px',
               borderRadius:    '50%',
-              backgroundColor: '#C0392B',
-              color:           '#fff',
-              border:          '6px solid #922B21',
-              fontSize:        '1.4rem',
-              fontWeight:      '600',
+              background:      'radial-gradient(circle at center, #7f1d1d, #450a0a)',
+              color:           '#fca5a5',
+              border:          '6px solid #ef4444',
+              fontSize:        '1.2rem',
+              fontWeight:      '700',
               cursor:          'pointer',
-              boxShadow:       '0 4px 20px rgba(192,57,43,0.45)',
+              boxShadow:       '0 0 40px rgba(239, 68, 68, 0.4)',
               letterSpacing:   '0.05em',
               display:         'flex',
               flexDirection:   'column',
               alignItems:      'center',
               justifyContent:  'center',
-              gap:             '6px',
+              gap:             '10px',
               margin:          '0 auto',
+              fontFamily:      "'Space Grotesk', sans-serif"
             }}
             aria-label="Send SOS emergency alert"
           >
-            <span style={{ fontSize: '2.5rem' }}>🆘</span>
+            <ShieldAlert size={48} strokeWidth={2.5} color="#fca5a5" />
             <span>SOS</span>
           </button>
-          <p style={{ marginTop: '12px', fontSize: '13px', color: '#666', textAlign: 'center' }}>
+          <p style={{ marginTop: '16px', fontSize: '12px', color: '#bdc8d1', textAlign: 'center' }}>
             Tap to send an emergency alert to your nearest coordinator
           </p>
         </div>
       )}
 
-      {/* ── Confirmation dialog ── */}
-      {phase === 'confirming' && (
-        <div style={{
-          background:   '#fff',
-          border:       '2px solid #C0392B',
-          borderRadius: '12px',
-          padding:      '1.25rem',
-          textAlign:    'center',
-        }}>
-          <p style={{ fontWeight: '600', fontSize: '1rem', marginBottom: '8px' }}>
-            ⚠️ Confirm Emergency SOS
-          </p>
-          <p style={{ fontSize: '13px', color: '#555', marginBottom: '1rem' }}>
-            This will alert your state coordinator, notify your emergency contacts via SMS,
-            and share your live location. Only use in a real emergency.
-          </p>
-          <textarea
-            placeholder="Optional: describe your situation (e.g. 'Flood water rising, need evacuation')"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            maxLength={500}
-            rows={3}
-            style={{
-              width:        '100%',
-              padding:      '8px',
-              borderRadius: '8px',
-              border:       '1px solid #ccc',
-              fontSize:     '14px',
-              marginBottom: '12px',
-              resize:       'vertical',
-            }}
-          />
-          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-            <button
-              onClick={handleConfirm}
-              style={{
-                padding:         '10px 28px',
-                background:      '#C0392B',
-                color:           '#fff',
-                border:          'none',
-                borderRadius:    '8px',
-                fontSize:        '15px',
-                fontWeight:      '600',
-                cursor:          'pointer',
-              }}
-            >
-              Yes, Send SOS
-            </button>
-            <button
-              onClick={handleCancel}
-              style={{
-                padding:      '10px 20px',
-                background:   'transparent',
-                color:        '#555',
-                border:       '1px solid #ccc',
-                borderRadius: '8px',
-                fontSize:     '15px',
-                cursor:       'pointer',
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Locating / Sending spinner ── */}
       {(phase === 'locating' || phase === 'sending') && (
-        <div style={{ textAlign: 'center', padding: '2rem 0' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '12px' }}>📡</div>
-          <p style={{ fontWeight: '500', color: '#ccc' }}>
-            {phase === 'locating' ? 'Getting your location…' : 'Sending SOS…'}
+        <div style={{ textAlign: 'center', padding: '32px 0', background: '#131b2e', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+          <Loader2 size={32} color="#38bdf8" style={{ animation: 'spin 2s linear infinite', margin: '0 auto 16px' }} />
+          <p style={{ fontWeight: '600', color: '#dae2fd', fontSize: '14px', margin: '0 0 6px', fontFamily: "'Space Grotesk', sans-serif" }}>
+            {phase === 'locating' ? 'Getting your location...' : 'Sending SOS...'}
           </p>
-          <p style={{ fontSize: '13px', color: '#666' }}>Please keep this screen open.</p>
+          <p style={{ fontSize: '12px', color: '#bdc8d1', margin: 0 }}>Please keep this screen open.</p>
         </div>
       )}
 
-      {/* ── Error state ── */}
       {phase === 'error' && (
         <div style={{
-          background:   '#FDECEA',
-          border:       '1px solid #E57373',
-          borderRadius: '10px',
-          padding:      '1rem',
+          background:   'rgba(239,68,68,0.1)',
+          border:       '1px solid rgba(239,68,68,0.5)',
+          borderRadius: '8px',
+          padding:      '16px',
           textAlign:    'center',
         }}>
-          <p style={{ color: '#B71C1C', fontWeight: '500', marginBottom: '8px' }}>
-            ❌ {errorMsg}
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, color: '#fca5a5', marginBottom: 12 }}>
+            <AlertTriangle size={16} />
+            <p style={{ fontWeight: '600', fontSize: '13px', margin: 0 }}>{errorMsg}</p>
+          </div>
           <button
             onClick={handleRetry}
             style={{
               padding:      '8px 20px',
-              background:   '#C0392B',
-              color:        '#fff',
-              border:       'none',
-              borderRadius: '8px',
+              background:   'transparent',
+              color:        '#fca5a5',
+              border:       '1px solid rgba(239,68,68,0.5)',
+              borderRadius: '4px',
+              fontSize:     '12px',
+              fontWeight:   '600',
               cursor:       'pointer',
+              display:      'inline-flex',
+              alignItems:   'center',
+              gap:          '6px'
             }}
           >
-            Try Again
+            <RefreshCcw size={14} /> Try Again
           </button>
         </div>
       )}

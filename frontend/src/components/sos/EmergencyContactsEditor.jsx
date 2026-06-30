@@ -7,6 +7,7 @@
 
 import { useState } from 'react';
 import { supabase } from '../../services/supabaseClient';
+import { Users, Plus, X, Check, Save } from 'lucide-react';
 
 export default function EmergencyContactsEditor({ initialContacts = [], userId }) {
   const [contacts, setContacts] = useState(
@@ -32,12 +33,11 @@ export default function EmergencyContactsEditor({ initialContacts = [], userId }
   };
 
   const handleSave = async () => {
-    // Validate: phone numbers should start with + and contain digits
     const valid = contacts.filter(c => c.name.trim() && c.phone.trim());
     const phoneRegex = /^\+?[0-9]{10,15}$/;
     for (const c of valid) {
       if (!phoneRegex.test(c.phone.replace(/\s/g, ''))) {
-        setError(`Invalid phone number: ${c.phone}. Use format: +919876543210`);
+        setError(`Invalid phone: ${c.phone}. Format: +919876543210`);
         return;
       }
     }
@@ -62,77 +62,94 @@ export default function EmergencyContactsEditor({ initialContacts = [], userId }
 
   return (
     <div style={{
-      background:   '#fff',
-      border:       '1px solid #ddd',
-      borderRadius: '12px',
-      padding:      '1rem',
-      marginTop:    '1rem',
+      background:   '#131b2e',
+      border:       '1px solid rgba(255,255,255,0.05)',
+      borderRadius: '8px',
+      padding:      '16px',
+      marginTop:    '16px',
+      fontFamily:   "'Inter', sans-serif"
     }}>
-      <h3 style={{ fontWeight: '600', marginBottom: '4px', fontSize: '15px' }}>
-        🚨 Emergency Contacts
-      </h3>
-      <p style={{ fontSize: '12px', color: '#666', marginBottom: '12px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+        <Users size={16} color="#38bdf8" />
+        <h3 style={{ fontWeight: '600', margin: 0, fontSize: '14px', color: '#dae2fd', fontFamily: "'Space Grotesk', sans-serif" }}>
+          Emergency Contacts
+        </h3>
+      </div>
+      <p style={{ fontSize: '12px', color: '#bdc8d1', margin: '0 0 16px', lineHeight: 1.5 }}>
         These people receive an SMS with your location when you trigger SOS (max 3).
       </p>
 
-      {contacts.map((contact, index) => (
-        <div key={index} style={{
-          display:       'flex',
-          gap:           '8px',
-          marginBottom:  '8px',
-          alignItems:    'center',
-        }}>
-          <input
-            type="text"
-            placeholder="Name"
-            value={contact.name}
-            onChange={(e) => updateContact(index, 'name', e.target.value)}
-            style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '14px', color: '#333' }}
-          />
-          <input
-            type="tel"
-            placeholder="+91 98765 43210"
-            value={contact.phone}
-            onChange={(e) => updateContact(index, 'phone', e.target.value)}
-            style={{ flex: 1.2, padding: '8px', borderRadius: '8px', border: '1px solid #ccc', fontSize: '14px', color: '#333' }}
-          />
-          <button
-            onClick={() => removeContact(index)}
-            style={{
-              padding:      '8px 10px',
-              background:   'transparent',
-              border:       '1px solid #e57373',
-              borderRadius: '8px',
-              color:        '#e57373',
-              cursor:       'pointer',
-              fontSize:     '14px',
-            }}
-            aria-label="Remove contact"
-          >
-            ✕
-          </button>
-        </div>
-      ))}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {contacts.map((contact, index) => (
+          <div key={index} style={{
+            display:       'flex',
+            gap:           '8px',
+            alignItems:    'center',
+          }}>
+            <input
+              type="text"
+              placeholder="Name"
+              value={contact.name}
+              onChange={(e) => updateContact(index, 'name', e.target.value)}
+              className="cp-input"
+              style={{ flex: 1, padding: '10px 12px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)', background: '#0b1326', fontSize: '13px', color: '#dae2fd' }}
+            />
+            <input
+              type="tel"
+              placeholder="+91 98765 43210"
+              value={contact.phone}
+              onChange={(e) => updateContact(index, 'phone', e.target.value)}
+              className="cp-input"
+              style={{ flex: 1.2, padding: '10px 12px', borderRadius: '4px', border: '1px solid rgba(255,255,255,0.1)', background: '#0b1326', fontSize: '13px', color: '#dae2fd' }}
+            />
+            <button
+              onClick={() => removeContact(index)}
+              style={{
+                width:        '38px',
+                height:       '38px',
+                display:      'flex',
+                alignItems:   'center',
+                justifyContent: 'center',
+                background:   'rgba(239, 68, 68, 0.1)',
+                border:       '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: '4px',
+                color:        '#ef4444',
+                cursor:       'pointer',
+                flexShrink:   0
+              }}
+              aria-label="Remove contact"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
 
       {error && (
-        <p style={{ color: '#C0392B', fontSize: '13px', marginBottom: '8px' }}>{error}</p>
+        <p style={{ color: '#fca5a5', fontSize: '12px', margin: '8px 0 0', display: 'flex', alignItems: 'center', gap: 6 }}>
+          <X size={12} /> {error}
+        </p>
       )}
 
-      <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+      <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
         {contacts.length < 3 && (
           <button
             onClick={addContact}
             style={{
               padding:      '8px 16px',
-              background:   'transparent',
-              border:       '1px solid #43A047',
-              borderRadius: '8px',
-              color:        '#43A047',
+              background:   'rgba(134, 239, 172, 0.1)',
+              border:       '1px solid rgba(134, 239, 172, 0.3)',
+              borderRadius: '4px',
+              color:        '#86efac',
               cursor:       'pointer',
-              fontSize:     '13px',
+              fontSize:     '12px',
+              fontWeight:   '600',
+              display:      'flex',
+              alignItems:   'center',
+              gap:          '6px'
             }}
           >
-            + Add Contact
+            <Plus size={14} /> Add Contact
           </button>
         )}
         <button
@@ -140,16 +157,19 @@ export default function EmergencyContactsEditor({ initialContacts = [], userId }
           disabled={saving}
           style={{
             padding:      '8px 20px',
-            background:   saving ? '#ccc' : '#1565C0',
+            background:   saving ? 'rgba(255,255,255,0.1)' : '#38bdf8',
             border:       'none',
-            borderRadius: '8px',
-            color:        '#fff',
+            borderRadius: '4px',
+            color:        saving ? '#bdc8d1' : '#00354a',
             cursor:       saving ? 'not-allowed' : 'pointer',
-            fontSize:     '13px',
-            fontWeight:   '500',
+            fontSize:     '12px',
+            fontWeight:   '600',
+            display:      'flex',
+            alignItems:   'center',
+            gap:          '6px'
           }}
         >
-          {saving ? 'Saving…' : saved ? '✓ Saved!' : 'Save Contacts'}
+          {saving ? 'Saving...' : saved ? <><Check size={14} /> Saved!</> : <><Save size={14} /> Save Contacts</>}
         </button>
       </div>
     </div>

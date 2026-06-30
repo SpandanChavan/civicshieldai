@@ -198,7 +198,8 @@ CREATE TABLE IF NOT EXISTS public.incident_reports (
   reviewed_at      TIMESTAMPTZ,
   rejection_reason TEXT,
   reporter_name    TEXT,
-  reporter_contact TEXT
+  reporter_contact TEXT,
+  ai_classification JSONB
 );
 CREATE INDEX IF NOT EXISTS idx_reports_location ON public.incident_reports USING GIST (location);
 CREATE INDEX IF NOT EXISTS idx_reports_status   ON public.incident_reports (status, created_at DESC);

@@ -172,12 +172,12 @@ BEGIN
   RETURN QUERY
   SELECT
     r.id,
-    r.name,
-    r.type,
-    r.status,
+    r.name::TEXT,
+    r.type::TEXT,
+    r.status::TEXT,
     r.quantity,
-    r.contact,
-    r.notes,
+    r.contact::TEXT,
+    r.notes::TEXT,
     -- Extract lat/lon back from the GEOGRAPHY column for the frontend
     ST_Y(r.location::geometry)::FLOAT  AS latitude,
     ST_X(r.location::geometry)::FLOAT  AS longitude,

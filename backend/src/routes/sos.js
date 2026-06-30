@@ -26,8 +26,8 @@ const router = express.Router();
 const createSosSchema = z.object({
   latitude:  z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
-  message:   z.string().max(500).optional(),
-  event_id:  z.string().uuid().optional(),
+  message:   z.string().max(500).optional().nullable(),
+  event_id:  z.string().uuid().optional().nullable(),
 });
 
 const acknowledgeSchema = z.object({
@@ -158,6 +158,8 @@ router.post('/', validate(createSosSchema), async (req, res, next) => {
     if (io) {
       if (stateId) {
         io.to(`state:${stateId}`).emit('sos:new', sosPayload);
+      } else {
+        io.to('role:coordinator').emit('sos:new', sosPayload);
       }
       io.to('role:admin').emit('sos:new', sosPayload);
       io.to('role:responder').emit('sos:new', sosPayload);
@@ -240,7 +242,7 @@ router.get('/', async (req, res, next) => {
       .select(`
         id, user_id, latitude, longitude, message, status, state_id,
         acknowledged_by, acknowledged_at, resolved_at, cancelled_at, created_at,
-        user_profiles!sos_requests_user_id_fkey ( full_name ),
+        user_profiles ( full_name ),
         states ( name, code )
       `)
       .order('created_at', { ascending: false })
@@ -342,7 +344,7 @@ router.get('/:id', async (req, res, next) => {
       .from('sos_requests')
       .select(`
         *,
-        user_profiles!sos_requests_user_id_fkey ( full_name ),
+        user_profiles ( full_name ),
         states ( name, code )
       `)
       .eq('id', req.params.id)
@@ -380,7 +382,7 @@ router.patch('/:id/acknowledge', async (req, res, next) => {
     }
 
     // Validate body (optional fields)
-    const parsed = acknowledgeSchema.safeParse(req.body);
+    const parsed = acknowledgeSchema.safeParse(req.body || {});
     if (!parsed.success) {
       return res.status(400).json({ error: 'Invalid body', details: parsed.error.flatten().fieldErrors });
     }
