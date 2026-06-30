@@ -8,6 +8,7 @@ import { routingApi } from '@/services/backendApi';
 import { useAuth } from '@/hooks/useAuth';
 import IndiaMapLayer from './IndiaMapLayer';
 import SeismicZoneLayer from './SeismicZoneLayer';
+import HeatmapLayer from './HeatmapLayer';
 
 // ── Fix Leaflet default marker icon paths for Vite ──
 // MUST be done before any L.map() call
@@ -238,6 +239,8 @@ export default function DisasterMap({ onEventSelect, applyJurisdictionFilter = f
       {mapReady && <IndiaMapLayer map={mapInstance.current} />}
       {/* BIS Seismic zone overlay */}
       {mapReady && <SeismicZoneLayer map={mapInstance.current} visible={filters.showSeismicZones !== false} />}
+      {/* E10: Event density heatmap */}
+      {mapReady && <HeatmapLayer map={mapInstance.current} events={events} visible={filters.showHeatmap === true} />}
     </div>
   );
 }
