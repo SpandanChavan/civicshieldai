@@ -27,7 +27,7 @@ export default defineConfig({
           enabled: true,
           type: 'module',
         },
-        includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png', 'offline.html'],
+        includeAssets: ['favicon.svg', 'icon-192.png', 'icon-512.png', 'offline.html'],
         manifest: {
           name: 'CivicShield AI',
           short_name: 'CivicShield',
