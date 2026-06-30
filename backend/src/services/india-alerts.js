@@ -60,6 +60,11 @@ async function fetchGDACSIndia() {
     const [lon, lat] = f.geometry?.coordinates || [null, null];
     if (!lat || !lon) continue;
 
+    // GDACS API ignores the bbox parameter, so we must manually filter
+    if (lon < INDIA_BBOX.minLon || lon > INDIA_BBOX.maxLon || lat < INDIA_BBOX.minLat || lat > INDIA_BBOX.maxLat) {
+      continue;
+    }
+
     const evType = GDACS_TYPE_MAP[p.eventtype] || 'Natural Event';
     const severity = GDACS_ALERT_MAP[p.alertlevel] || 'Medium';
     const countryName = p.country || 'India';

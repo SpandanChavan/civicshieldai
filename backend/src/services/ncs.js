@@ -59,7 +59,7 @@ function getSeverity(mag, zone) {
  * Fetch India-specific earthquakes from USGS FDSN.
  * Returns events in the standard format for apiPollers.js to upsert.
  */
-async function fetchNCSEarthquakes(minMag = 3.0, dayRange = 2) {
+async function fetchNCSEarthquakes(minMag = 3.0, dayRange = 14) {
   const endTime   = new Date().toISOString();
   const startTime = new Date(Date.now() - dayRange * 24 * 3600 * 1000).toISOString();
 
