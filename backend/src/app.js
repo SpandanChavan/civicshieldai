@@ -155,11 +155,11 @@ io.use(async (socket, next) => {
 
 // Broadcasts in apiPollers use io.to('room') instead of io.emit.
 io.on('connection', (socket) => {
-  console.log(`[Socket] Client connected: ${socket.id}`);
-
   // Server sets these values based on the secure io.use() middleware
   const role    = socket.userRole;
   const stateId = socket.userStateId;
+
+  console.log(`[Socket] Client connected: ${socket.id} | Role: ${role} | State: ${stateId}`);
 
   socket.join('public');                          // all clients
   if (role)    socket.join(`role:${role}`);       // e.g. role:coordinator

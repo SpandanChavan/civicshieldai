@@ -19,10 +19,14 @@ const profileCache = new NodeCache({ stdTTL: 60, checkperiod: 120 });
  */
 const stateScope = async (req, res, next) => {
   const authHeader = req.headers.authorization;
+
+  // 1) Get standard user info from Auth header using Supabase
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return next(); // unauthenticated request — continue
   }
   const token = authHeader.split(' ')[1];
+
+
 
   try {
     // 1. Verify JWT with the anon client (m5: singleton, no new client per request)
