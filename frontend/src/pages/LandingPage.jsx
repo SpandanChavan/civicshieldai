@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useMemo, Component, Suspense } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Canvas, useFrame, useLoader } from '@react-three/fiber';
+import Navbar from '@/components/shared/Navbar';
 import { Stars, OrbitControls } from '@react-three/drei';
 import { TextureLoader } from 'three';
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion';
@@ -374,32 +375,7 @@ export default function LandingPage() {
       </div>
 
       {/* ── NAVBAR ─────────────────────────────────────────────────────────── */}
-      <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 3rem', height: 64, background: 'rgba(6,19,26,0.85)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(0,166,147,0.15)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,#00A693,#00A693)', boxShadow: '0 0 20px rgba(0,166,147,0.4)' }}>
-            <Shield size={18} color="white" />
-          </div>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 14, color: 'white', lineHeight: 1.2 }}>CivicShield <span style={{ color: '#00A693' }}>AI</span></div>
-            <div style={{ fontSize: 9, color: '#64748b', lineHeight: 1 }}>AI-Powered Disaster Intelligence</div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', gap: 28 }}>
-          {['Home', 'Live Alerts', 'Disaster Map', 'Resources', 'About', 'Contact'].map(l => (
-            <a key={l} onClick={e => { e.preventDefault(); if (l === 'Live Alerts' || l === 'Disaster Map') navigate('/portal'); }}
-              href="#" style={{ fontSize: 13, color: '#94a3b8', fontWeight: 500, cursor: 'pointer', transition: 'color .2s' }}
-              onMouseEnter={e => e.target.style.color = 'white'} onMouseLeave={e => e.target.style.color = '#94a3b8'}>{l}</a>
-          ))}
-        </div>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <Link to="/login" style={{ padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 600, color: '#cbd5e1', border: '1px solid rgba(255,255,255,0.15)', background: 'transparent' }}>
-            Sign In
-          </Link>
-          <Link to="/register" style={{ padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 700, color: '#06131A', background: '#00A693', boxShadow: '0 4px 20px rgba(0,166,147,0.35)' }}>
-            Sign Up
-          </Link>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* ── HERO ───────────────────────────────────────────────────────────── */}
       <section style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', paddingTop: 64, position: 'relative' }}>

@@ -73,19 +73,46 @@ export function useDisasterEvents(filters = {}) {
   useEffect(() => {
     const envUrl = import.meta.env.VITE_BACKEND_URL;
     const backendUrl = (envUrl && envUrl.trim() !== '') ? envUrl : `http://${window.location.hostname}:4000`;
-    if (!socket) {
-      socket = io(backendUrl, { transports: ['websocket', 'polling'] });
-    }
-
-    socket.on('connect', () => setConnected(true));
-    socket.on('disconnect', () => setConnected(false));
-    socket.on('events:updated', () => {
-      queryClient.invalidateQueries({ queryKey: ['events'] });
-      queryClient.invalidateQueries({ queryKey: ['event-stats'] });
+    
+    const initSocket = async () => {
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token;
+      
+      if (!socket) {
+        socket = io(backendUrl, { 
+          transports: ['websocket', 'polling'],
+          auth: token ? { token } : {}
+        });
+        
+        socket.on('connect', () => setConnected(true));
+        socket.on('disconnect', () => setConnected(false));
+        socket.on('events:updated', () => {
+          queryClient.invalidateQueries({ queryKey: ['events'] });
+          queryClient.invalidateQueries({ queryKey: ['event-stats'] });
+        });
+      } else if (token && socket.auth?.token !== token) {
+        socket.auth = { token };
+        socket.disconnect().connect();
+      }
+    };
+    
+    initSocket();
+    
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      const token = session?.access_token;
+      if (socket) {
+        socket.auth = token ? { token } : {};
+        if (socket.connected) {
+          socket.disconnect().connect();
+        }
+      }
     });
 
     return () => {
       socket?.off('events:updated');
+      if (authListener?.subscription) {
+        authListener.subscription.unsubscribe();
+      }
     };
   }, [setConnected, queryClient]);
 

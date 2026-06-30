@@ -63,6 +63,13 @@ export default function PublicPortal() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [activeTab, setActiveTab]         = useState('events');
   const portalRightOpen = useAppStore((s) => s.portalRightOpen);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const recentAll      = events.slice(0, 30);
 
@@ -106,8 +113,8 @@ export default function PublicPortal() {
         </div>
 
         {/* ════ RIGHT PANEL — Alerts & Info ════════════ */}
-        <div style={{ width: portalRightOpen ? 300 : 0, flexShrink: 0, overflow: 'hidden', transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)', background: 'rgba(6,14,22,0.92)', backdropFilter: 'blur(20px)', borderLeft: '1px solid rgba(0,166,147,0.12)', display: 'flex', flexDirection: 'column' }}>
-          <div style={{ width: 300, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: "'Inter', sans-serif" }}>
+        <div style={{ width: portalRightOpen ? (isMobile ? 'min(85vw, 320px)' : 300) : 0, flexShrink: 0, overflow: 'hidden', transition: 'width 0.25s cubic-bezier(0.4,0,0.2,1)', background: 'rgba(6,14,22,0.92)', backdropFilter: 'blur(20px)', borderLeft: '1px solid rgba(0,166,147,0.12)', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ width: isMobile ? 'min(85vw, 320px)' : 300, height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden', fontFamily: "'Inter', sans-serif" }}>
 
             {/* Panel header */}
             <div style={{ padding: '14px 14px 0', flexShrink: 0 }}>

@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Navigate, Link } from 'react-router-dom';
+import Navbar from '@/components/shared/Navbar';
 import { supabase } from '@/services/supabaseClient';
 import { useAuth } from '@/hooks/useAuth';
 import { motion } from 'framer-motion';
@@ -124,42 +125,7 @@ export default function LoginPage() {
       ))}
 
       {/* ── Custom Navbar ──────────────────────────────────── */}
-      <nav style={{
-        position: 'relative', zIndex: 20,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 2.5rem', height: 64,
-        background: 'rgba(6,14,22,0.7)',
-        backdropFilter: 'blur(20px)',
-        borderBottom: '1px solid rgba(0,166,147,0.12)',
-      }}>
-        {/* Brand */}
-        <Link to="/landing" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 34, height: 34, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#00A693', boxShadow: '0 0 18px rgba(0,166,147,0.4)' }}>
-            <Shield size={17} color="white" />
-          </div>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 14, color: 'white', lineHeight: 1.2 }}>
-              CivicShield <span style={{ color: '#00A693' }}>AI</span>
-            </div>
-            <div style={{ fontSize: 9, color: '#475569', lineHeight: 1 }}>AI-Powered Disaster Intelligence</div>
-          </div>
-        </Link>
-
-        {/* Center breadcrumb */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <Link to="/landing" style={{ fontSize: 12, color: '#475569' }}>Home</Link>
-          <ChevronRight size={12} color="#334155" />
-          <span style={{ fontSize: 12, color: '#00A693', fontWeight: 600 }}>Sign In</span>
-        </div>
-
-        {/* Right CTA */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, color: '#64748b' }}>New here?</span>
-          <Link to="/register" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '7px 16px', borderRadius: 10, background: '#00A693', color: 'white', fontSize: 13, fontWeight: 700, boxShadow: '0 4px 16px rgba(0,166,147,0.3)' }}>
-            Create Account <ArrowRight size={13} />
-          </Link>
-        </div>
-      </nav>
+      <Navbar />
 
       {/* ── Main content ──────────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem', position: 'relative', zIndex: 10 }}>
