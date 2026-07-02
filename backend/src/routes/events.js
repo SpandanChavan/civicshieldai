@@ -118,6 +118,22 @@ router.get('/stats/summary', cacheMiddleware(60), async (req, res) => {
   }
 });
 
+// ── GET /api/events/ingestion-health (B1) ────────────
+// Returns the in-memory ingestion health snapshot per data source.
+// Accessible to coordinator and admin roles (not public — requires auth).
+// NOTE: Must be declared BEFORE /:id — same reason as /stats/summary above.
+router.get('/ingestion-health', (req, res) => {
+  if (!req.userRole || !['coordinator', 'admin'].includes(req.userRole)) {
+    return res.status(403).json({ error: 'Coordinator or admin role required' });
+  }
+  try {
+    const { getIngestionHealth } = require('../cron/apiPollers');
+    res.json({ data: getIngestionHealth(), timestamp: new Date().toISOString() });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── GET /api/events/:id ───────────────────────────────
 router.get('/:id', async (req, res) => {
   try {
@@ -153,21 +169,6 @@ router.patch('/:id/deactivate', async (req, res) => {
       .single();
     if (error) throw error;
     res.json({ data });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
-
-// ── GET /api/events/ingestion-health (B1) ────────────
-// Returns the in-memory ingestion health snapshot per data source.
-// Accessible to coordinator and admin roles (not public — requires auth).
-router.get('/ingestion-health', (req, res) => {
-  if (!req.userRole || !['coordinator', 'admin'].includes(req.userRole)) {
-    return res.status(403).json({ error: 'Coordinator or admin role required' });
-  }
-  try {
-    const { getIngestionHealth } = require('../cron/apiPollers');
-    res.json({ data: getIngestionHealth(), timestamp: new Date().toISOString() });
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
