@@ -15,7 +15,7 @@ import httpx
 HF_API_TOKEN = os.getenv("HF_API_TOKEN")
 # A general image classifier; override with HF_VISION_MODEL if desired.
 HF_MODEL = os.getenv("HF_VISION_MODEL", "microsoft/resnet-50")
-HF_URL = f"https://api-inference.huggingface.co/models/{HF_MODEL}"
+HF_URL = f"https://router.huggingface.co/hf-inference/models/{HF_MODEL}"
 
 # Map keywords found in the model's top label → disaster damage type + severity.
 # Ordered: first match wins.
@@ -52,9 +52,13 @@ async def classify_image_url(image_url: str) -> dict:
             img_resp.raise_for_status()
 
             # 2. Send to HF inference API
+            content_type = img_resp.headers.get("content-type", "image/jpeg")
             infer = await client.post(
                 HF_URL,
-                headers={"Authorization": f"Bearer {HF_API_TOKEN}"},
+                headers={
+                    "Authorization": f"Bearer {HF_API_TOKEN}",
+                    "Content-Type": content_type,
+                },
                 content=img_resp.content,
             )
             if infer.status_code == 503:
