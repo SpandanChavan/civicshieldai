@@ -93,8 +93,10 @@ async function fetchCWCFloodData() {
 
     events.push({
       title:       `${level} Alert: ${river} at ${name}, ${state}`,
-      description: `River discharge ${Math.round(maxDischarge).toLocaleString('en-IN')} m³/s — ` +
-                   `${Math.round((maxDischarge / (isDanger ? dangerThresh : highThresh)) * 100)}% of ${level} threshold. Peak: ${peakDate}.`,
+      // Use the `desc` built above: it was constructed for this field but was
+      // never referenced, while this key rebuilt a less informative duplicate.
+      // `desc` names the river, station, state and the absolute threshold.
+      description: desc,
       event_type:  'Flood',
       severity,
       location:    { lat, lon },

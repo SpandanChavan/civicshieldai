@@ -4,6 +4,9 @@ const crypto = require('crypto');
 const { fetchWithCache } = require('./cacheService');
 
 // SACHET CAP XML feed — NDMA's official national alert system
+// Retained for reference only — SACHET has no public server-side API and this
+// module is superseded by services/india-alerts.js (not imported anywhere).
+// eslint-disable-next-line no-unused-vars
 const SACHET_CAP_URL = 'https://sachet.ndma.gov.in/cap_public_website/FetchCapAlert';
 const SACHET_RSS_URL = 'https://sachet.ndma.gov.in/cap_public_website/getAllPublicAlert';
 

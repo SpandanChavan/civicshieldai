@@ -24,7 +24,28 @@ const cronHealth = {};
 // Degrades silently (returns null) if ML is unreachable or misconfigured.
 const ML_SEVERITY_URL = `${process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000'}/classify/severity`;
 
+// Circuit breaker. Without one, a down ML service costs a full 3s timeout for
+// EVERY event in EVERY poll — on Render's free tier the ML dyno sleeps, so this
+// is the normal case, not the edge case. After ML_FAILURE_THRESHOLD consecutive
+// failures the circuit opens and calls short-circuit for ML_COOLDOWN_MS; one
+// trial call is then allowed through to test recovery.
+const ML_FAILURE_THRESHOLD = 5;
+const ML_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes
+let mlConsecutiveFailures = 0;
+let mlCircuitOpenedAt = 0;
+
+function mlCircuitIsOpen() {
+  if (mlConsecutiveFailures < ML_FAILURE_THRESHOLD) return false;
+  if (Date.now() - mlCircuitOpenedAt >= ML_COOLDOWN_MS) {
+    // Cooldown elapsed — allow a single trial request through (half-open).
+    mlConsecutiveFailures = ML_FAILURE_THRESHOLD - 1;
+    return false;
+  }
+  return true;
+}
+
 async function calibrateSeverity(event) {
+  if (mlCircuitIsOpen()) return null;
   try {
     const payload = {
       event_type: event.event_type || 'Unknown',
@@ -36,11 +57,20 @@ async function calibrateSeverity(event) {
       population_density: event.raw_data?.pop_density ?? null,
     };
     const { data } = await axios.post(ML_SEVERITY_URL, payload, { timeout: 3000 });
+    if (mlConsecutiveFailures > 0) {
+      console.log('[Cron] ML severity service recovered — circuit closed');
+      mlConsecutiveFailures = 0;
+    }
     if (data?.confidence >= 0.80 && data?.severity && data.severity !== event.severity) {
       return data.severity;
     }
   } catch (_) {
-    // ML service unavailable — degrade silently
+    // ML service unavailable — degrade silently, but count toward the breaker.
+    mlConsecutiveFailures += 1;
+    if (mlConsecutiveFailures === ML_FAILURE_THRESHOLD) {
+      mlCircuitOpenedAt = Date.now();
+      console.warn(`[Cron] ML severity service unreachable ${ML_FAILURE_THRESHOLD}x — circuit open for ${ML_COOLDOWN_MS / 60000} min`);
+    }
   }
   return null;
 }
@@ -60,33 +90,52 @@ async function upsertEvents(events, io, eventType) {
 
   // Resolve state_id per event (N2). Cache by rounded coords (~1km) so nearby
   // points in the same batch don't each incur a get_state_from_point round-trip.
+  // The cache stores the in-flight PROMISE, not the resolved value, so N events
+  // sharing a cell issue exactly one RPC even when resolved concurrently.
   const stateCache = new Map();
-  async function resolveStateId(lat, lon) {
+  function resolveStateId(lat, lon) {
+    // Upstream feeds occasionally emit null/NaN coordinates. Guard here so a
+    // single malformed row can't reject the whole concurrency window (and, as
+    // before this loop was parallelised, abort the entire poll).
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return Promise.resolve(null);
     const key = `${lat.toFixed(2)},${lon.toFixed(2)}`;
     if (stateCache.has(key)) return stateCache.get(key);
-    let state_id = null;
-    try {
-      const { data } = await db.rpc('get_state_from_point', { lat, lon });
-      if (data) state_id = data;
-    } catch (err) {}
-    stateCache.set(key, state_id);
-    return state_id;
+    const p = db.rpc('get_state_from_point', { lat, lon })
+      .then(({ data }) => data || null)
+      .catch(() => null);
+    stateCache.set(key, p);
+    return p;
   }
 
-  // Format location as WKT POINT for PostGIS, resolve state_id (N2),
-  // and calibrate severity via ML service (C2 — degrades gracefully)
-  const formatted = [];
-  for (const e of events) {
-    const state_id = e.location ? await resolveStateId(e.location.lat, e.location.lon) : null;
-    const mlSeverity = await calibrateSeverity(e);
-    formatted.push({
-      ...e,
-      severity: mlSeverity || e.severity,
-      state_id,
-      location: e.location
-        ? `SRID=4326;POINT(${e.location.lon} ${e.location.lat})`
-        : null,
-    });
+  // PERF: this loop used to be fully serial — one awaited state RPC plus one
+  // awaited 3s ML call per event. A FIRMS batch of ~300 hotspots therefore
+  // serialized into minutes of wall time and could overrun the poll interval.
+  // Now events are processed in bounded-concurrency windows: the network calls
+  // overlap, while CONCURRENCY caps simultaneous load on the ML service and
+  // Postgres so we don't trade one bottleneck for a thundering herd.
+  const CONCURRENCY = 10;
+  const formatted = new Array(events.length);
+
+  for (let start = 0; start < events.length; start += CONCURRENCY) {
+    const window = events.slice(start, start + CONCURRENCY);
+    await Promise.all(window.map(async (e, i) => {
+      const hasCoords = e.location
+        && Number.isFinite(e.location.lat)
+        && Number.isFinite(e.location.lon);
+
+      const [state_id, mlSeverity] = await Promise.all([
+        hasCoords ? resolveStateId(e.location.lat, e.location.lon) : null,
+        calibrateSeverity(e),
+      ]);
+      formatted[start + i] = {
+        ...e,
+        severity: mlSeverity || e.severity,
+        state_id,
+        location: hasCoords
+          ? `SRID=4326;POINT(${e.location.lon} ${e.location.lat})`
+          : null,
+      };
+    }));
   }
 
   const { error, data } = await db
@@ -240,7 +289,11 @@ function startCronJobs(io) {
   });
 
   // 🇮🇳 ── India Alerts (GDACS BBox + FloodList) every 5 min ──
-  cron.schedule('*/5 * * * *', async () => {
+  // Offset by 1 minute from the USGS poll. Both previously ran at '*/5', so
+  // every fifth minute fired two ingestion batches at once — each doing state
+  // RPCs and ML calls — doubling peak load for no reason. Every other poller
+  // in this file is already staggered; this one was the exception.
+  cron.schedule('1,6,11,16,21,26,31,36,41,46,51,56 * * * *', async () => {
     console.log('[Cron] Polling India alerts (GDACS BBox + FloodList)...');
     try {
       const events = await fetchIndiaAlerts();

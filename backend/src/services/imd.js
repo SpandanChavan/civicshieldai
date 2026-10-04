@@ -1,5 +1,4 @@
 const axios = require('../utils/axiosClient');
-const crypto = require('crypto');
 const { fetchWithCache } = require('./cacheService');
 
 /**
@@ -12,7 +11,6 @@ const { fetchWithCache } = require('./cacheService');
  */
 
 const OPENMETEO_FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
-const OPENMETEO_AIR_URL = 'https://air-quality-api.open-meteo.com/v1/air-quality';
 
 // Major Indian cities with coordinates for multi-point monitoring
 const INDIA_MONITORING_POINTS = [
@@ -41,7 +39,6 @@ const INDIA_MONITORING_POINTS = [
 // IMD Heatwave thresholds (India-specific, as per IMD definition)
 const HEATWAVE_THRESHOLD = 40; // °C (Plains), 30°C (Hills), 37°C (Coastal)
 const SEVERE_HEATWAVE_THRESHOLD = 45;
-const COLD_WAVE_THRESHOLD = 10; // Below normal by 4.5°C+ AND max temp ≤ 16°C
 const EXTREME_COLD_THRESHOLD = 4;
 
 // India monsoon season (June–September)
@@ -67,7 +64,6 @@ async function fetchImdAlerts() {
   const cacheKey = 'imd:india:weather:hazards';
   return fetchWithCache(cacheKey, 1800, async () => { // 30 min cache
     const alerts = [];
-    const now = new Date();
 
     // Batch fetch forecasts for all monitoring points
     // Open-Meteo supports up to daily batch queries

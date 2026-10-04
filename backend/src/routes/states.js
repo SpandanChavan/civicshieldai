@@ -1,13 +1,13 @@
 const express = require('express');
-const { createClient } = require('@supabase/supabase-js');
+const { cacheMiddleware } = require('../middleware/cache');
+const { getAnonDb: getDb } = require('../lib/db');
 const router = express.Router();
 
-function getDb() {
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
-}
-
 // ── GET /api/states ───────────────────────────────────
-router.get('/', async (req, res) => {
+// India's 36 states/UTs are static reference data — seeded once by migration
+// 006 and never mutated at runtime. Caching for an hour removes a DB round-trip
+// from a request the frontend makes on essentially every page load.
+router.get('/', cacheMiddleware(3600), async (req, res) => {
   try {
     const { data, error } = await getDb()
       .from('states')

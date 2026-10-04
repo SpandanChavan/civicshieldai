@@ -1,3 +1,6 @@
+import { supabase } from '@/services/supabaseClient';
+import { backendApi } from '@/services/backendApi';
+
 export async function registerAndSubscribeToPush() {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
     console.log('Push messaging is not supported');
@@ -21,23 +24,50 @@ export async function registerAndSubscribeToPush() {
     }
 
     const applicationServerKey = urlBase64ToUint8Array(vapidPublicKey);
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey,
-    });
 
-    // Send subscription to backend
-    await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:4000'}/api/alerts/subscribe`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(subscription),
+    // Reuse an existing subscription if the browser already has one — calling
+    // subscribe() again with the same key returns the same object, but reading
+    // it first avoids a redundant round-trip on every app load.
+    const subscription =
+      (await registration.pushManager.getSubscription()) ||
+      (await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey,
+      }));
+
+    // Send the subscription through backendApi, NOT bare fetch(). The axios
+    // instance carries the request interceptor that attaches the Supabase JWT,
+    // so the backend's stateScope middleware can resolve req.userId and store
+    // the row against this user. Bare fetch() sent no Authorization header, so
+    // every subscription landed with user_id = NULL and push could only ever
+    // broadcast to everyone — never to a state or an individual.
+    await backendApi.post('/alerts/subscribe', {
+      endpoint: subscription.endpoint,
+      keys: subscription.toJSON().keys,
+      device_info: { user_agent: navigator.userAgent },
     });
 
     console.log('Push subscription successful');
   } catch (error) {
     console.error('Error during push subscription:', error);
+  }
+}
+
+/**
+ * Re-register the push subscription against the *current* user.
+ *
+ * A subscription row is keyed by endpoint (unique), and the endpoint does not
+ * change when a different person signs in on the same device. Without this,
+ * the row would keep pointing at whoever subscribed first. Call on sign-in so
+ * the upsert re-binds the endpoint to the new user_id.
+ */
+export async function resubscribePushForCurrentUser() {
+  try {
+    const { data } = await supabase.auth.getSession();
+    if (!data?.session) return;
+    await registerAndSubscribeToPush();
+  } catch (error) {
+    console.warn('[Push] Re-subscribe skipped:', error.message);
   }
 }
 

@@ -1,11 +1,8 @@
 const express = require('express');
-const { createClient } = require('@supabase/supabase-js');
 const { z } = require('zod');
+const { getAdminDb: getDb } = require('../lib/db');
+const { cacheMiddleware } = require('../middleware/cache');
 const router = express.Router();
-
-function getDb() {
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-}
 
 // Middleware: Admin only
 router.use((req, res, next) => {
@@ -55,14 +52,31 @@ router.patch('/coordinators/:id', async (req, res) => {
 
 // ── GET /api/admin/stats ──────────────────────────────
 // Nationwide aggregated stats for the admin dashboard
-router.get('/stats', async (req, res) => {
+router.get('/stats', cacheMiddleware(30), async (req, res) => {
   try {
     const db = getDb();
-    const [events, alerts, reports, coordinators, states] = await Promise.all([
-      db.from('events').select('id, severity, event_type, state_id', { count: 'exact' }).eq('is_active', true),
-      db.from('alerts').select('id, status', { count: 'exact' }),
-      db.from('incident_reports').select('id, status, state_id', { count: 'exact' }),
-      db.from('user_profiles').select('id, state_id, states(name, code)', { count: 'exact' }).eq('role', 'coordinator'),
+
+    // PERF: this endpoint used to pull EVERY row of events, alerts and
+    // incident_reports into Node just to call .length on them. On a populated
+    // database that is tens of thousands of rows over the wire per dashboard
+    // load, for four integers.
+    //
+    // Split into two kinds of query:
+    //   • Pure totals  → head:true + count:'exact'. Postgres returns the count
+    //     in the Content-Range header and streams ZERO rows.
+    //   • Breakdowns   → still need per-row grouping keys, but select only the
+    //     one or two columns actually used, never '*'.
+    const [
+      eventsCount, alertsCount, reportsCount, coordinatorsCount,
+      eventsByState, alertsByStatusRows, reportsByState, states,
+    ] = await Promise.all([
+      db.from('events').select('id', { count: 'exact', head: true }).eq('is_active', true),
+      db.from('alerts').select('id', { count: 'exact', head: true }),
+      db.from('incident_reports').select('id', { count: 'exact', head: true }),
+      db.from('user_profiles').select('id', { count: 'exact', head: true }).eq('role', 'coordinator'),
+      db.from('events').select('state_id').eq('is_active', true),
+      db.from('alerts').select('status'),
+      db.from('incident_reports').select('state_id, status'),
       db.from('states').select('id, name, code'),
     ]);
 
@@ -71,34 +85,31 @@ router.get('/stats', async (req, res) => {
     (states.data || []).forEach(s => {
       stateMap[s.id] = { name: s.name, code: s.code, events: 0, reports: 0, pendingReports: 0 };
     });
-    (events.data || []).forEach(e => {
+    (eventsByState.data || []).forEach(e => {
       if (e.state_id && stateMap[e.state_id]) stateMap[e.state_id].events++;
     });
-    (reports.data || []).forEach(r => {
+
+    const reportsByStatus = {};
+    (reportsByState.data || []).forEach(r => {
       if (r.state_id && stateMap[r.state_id]) {
         stateMap[r.state_id].reports++;
         if (r.status === 'pending_review') stateMap[r.state_id].pendingReports++;
       }
-    });
-
-    const alertsBySeverity = {};
-    const alertsByStatus = {};
-    (alerts.data || []).forEach(a => {
-      alertsByStatus[a.status] = (alertsByStatus[a.status] || 0) + 1;
-    });
-
-    const reportsByStatus = {};
-    (reports.data || []).forEach(r => {
       reportsByStatus[r.status] = (reportsByStatus[r.status] || 0) + 1;
+    });
+
+    const alertsByStatus = {};
+    (alertsByStatusRows.data || []).forEach(a => {
+      alertsByStatus[a.status] = (alertsByStatus[a.status] || 0) + 1;
     });
 
     res.json({
       data: {
         totals: {
-          activeEvents: events.data?.length || 0,
-          totalAlerts: alerts.data?.length || 0,
-          totalReports: reports.data?.length || 0,
-          totalCoordinators: coordinators.data?.length || 0,
+          activeEvents:      eventsCount.count       || 0,
+          totalAlerts:       alertsCount.count       || 0,
+          totalReports:      reportsCount.count      || 0,
+          totalCoordinators: coordinatorsCount.count || 0,
         },
         alertsByStatus,
         reportsByStatus,

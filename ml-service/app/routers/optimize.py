@@ -39,8 +39,8 @@ def optimize_vehicle_routes(req: VehicleRoutingRequest):
 
     try:
         result = optimize_routes(
-            depot=req.depot.dict(),
-            destinations=[d.dict() for d in req.destinations],
+            depot=req.depot.model_dump(),
+            destinations=[d.model_dump() for d in req.destinations],
             num_vehicles=req.num_vehicles,
             max_distance_km=req.max_distance_km,
         )

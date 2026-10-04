@@ -2,5 +2,5 @@
   "env": { "node": true, "es2021": true, "jest": true },
   "extends": "eslint:recommended",
   "parserOptions": { "ecmaVersion": "latest" },
-  "rules": { "no-unused-vars": "warn", "no-undef": "off", "no-empty": "warn" }
+  "rules": { "no-unused-vars": ["warn", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }], "no-undef": "off", "no-empty": "warn" }
 }

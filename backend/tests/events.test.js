@@ -1,22 +1,27 @@
 const request = require('supertest');
 const express = require('express');
-const eventsRouter = require('../src/routes/events');
 
-// Mock Supabase
-jest.mock('@supabase/supabase-js', () => {
-  return {
-    createClient: jest.fn(() => ({
-      from: jest.fn().mockReturnThis(),
-      select: jest.fn().mockReturnThis(),
-      order: jest.fn().mockReturnThis(),
-      range: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      single: jest.fn().mockResolvedValue({ data: { id: 'test-event-1', location: null } }),
-      then: jest.fn((cb) => cb({ data: [{ id: 'test-event-1', location: null }], error: null })),
-    })),
+// ── Supabase mock ──────────────────────────────────────────────────────
+// events.js now uses the getAdminDb() singleton from lib/db (previously it
+// called createClient() per request), so the mock moves to lib/db to match
+// the convention already used by alerts/incidents/predictions tests.
+jest.mock('../src/lib/db', () => {
+  const chain = {
+    select: jest.fn().mockReturnThis(),
+    insert: jest.fn().mockReturnThis(),
+    update: jest.fn().mockReturnThis(),
+    eq:     jest.fn().mockReturnThis(),
+    order:  jest.fn().mockReturnThis(),
+    range:  jest.fn().mockReturnThis(),
+    limit:  jest.fn().mockReturnThis(),
+    single: jest.fn().mockResolvedValue({ data: { id: 'test-event-1', location: null }, error: null }),
+    then:   jest.fn((cb) => cb({ data: [{ id: 'test-event-1', location: null }], error: null })),
   };
+  const db = { from: jest.fn().mockReturnValue(chain), rpc: jest.fn().mockResolvedValue({ data: null }) };
+  return { getAdminDb: jest.fn().mockReturnValue(db), getAnonDb: jest.fn().mockReturnValue(db) };
 });
+
+const eventsRouter = require('../src/routes/events');
 
 const app = express();
 app.use(express.json());

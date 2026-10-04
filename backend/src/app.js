@@ -94,14 +94,20 @@ app.get('/health', async (_req, res) => {
   try {
     const { error } = await getAdminDb().from('events').select('id').limit(1);
     if (!error) dbStatus = 'connected';
-  } catch (e) {}
+  } catch (e) {
+    // Intentional: /health must always answer 200 with a status body. A DB
+    // outage is reported as database:'disconnected', never as a failed probe.
+  }
 
   try {
     if (process.env.ML_SERVICE_URL) {
       await axios.get(`${process.env.ML_SERVICE_URL}/health`, { timeout: 3000 });
       mlStatus = 'online';
     }
-  } catch (e) {}
+  } catch (e) {
+    // Intentional: same contract — an unreachable ML service is reported as
+    // ml_service:'offline' rather than failing the health check itself.
+  }
 
   res.json({
     status: 'ok',

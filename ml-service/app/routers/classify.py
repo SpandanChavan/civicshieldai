@@ -41,7 +41,7 @@ def classify_event_severity(req: SeverityRequest):
     Classify disaster severity using a rule-based + ML model.
     """
     try:
-        return classify_severity(req.dict())
+        return classify_severity(req.model_dump())
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
