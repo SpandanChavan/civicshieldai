@@ -2319,7 +2319,7 @@ TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_SMS_NUMBER=+1XXXXXXXXXX
 SUPABASE_URL=https://your-project.supabase.co
-SUPABASE_SERVICE_KEY=eyJ...
+SUPABASE_SERVICE_KEY=<your-service-role-key>
 ```
 
 **`frontend/.env.local`** — these must already be set:
