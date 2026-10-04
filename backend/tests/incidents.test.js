@@ -28,8 +28,9 @@ jest.mock('../src/lib/db', () => {
     order:  jest.fn().mockReturnThis(),
     range:  jest.fn().mockReturnThis(),
     limit:  jest.fn().mockReturnThis(),
-    single: jest.fn().mockResolvedValue({ data: incidentRow, error: null }),
-    then:   jest.fn((cb) => cb({ data: [incidentRow], error: null })),
+    single:      jest.fn().mockResolvedValue({ data: incidentRow, error: null }),
+    maybeSingle: jest.fn().mockResolvedValue({ data: incidentRow, error: null }),
+    then:        jest.fn((cb) => cb({ data: [incidentRow], error: null })),
   };
 
   const db = { from: jest.fn().mockReturnValue(chain) };
@@ -39,12 +40,16 @@ jest.mock('../src/lib/db', () => {
 const incidentsRouter = require('../src/routes/incidents');
 
 // ── App factory ────────────────────────────────────────────────────────
-function makeApp({ userId, role } = {}) {
+function makeApp({ userId, role, stateId } = {}) {
   const app = express();
   app.use(express.json());
   // Simulate stateScope middleware attaching auth context
   app.use((req, _res, next) => {
-    if (userId) { req.userId = userId; req.userRole = role; }
+    if (userId) {
+      req.userId      = userId;
+      req.userRole    = role;
+      req.userStateId = stateId;
+    }
     next();
   });
   app.use('/api/incidents', incidentsRouter);
@@ -64,8 +69,24 @@ describe('Incidents API — auth and workflow', () => {
   });
 
   describe('GET /api/incidents/:id', () => {
-    it('returns 200 with incident data', async () => {
+    // This endpoint returns reporter_name, reporter_contact and the reporter's
+    // exact coordinates. It previously had no auth check and this test asserted
+    // that unauthenticated 200 — i.e. it locked in the vulnerability. Access now
+    // matches the list endpoint: owner, coordinator of that state, admin.
+    it('returns 401 for an unauthenticated caller', async () => {
       const res = await request(makeApp()).get('/api/incidents/incident-uuid-1');
+      expect(res.statusCode).toBe(401);
+    });
+
+    it('returns 403 for an unrelated citizen', async () => {
+      const res = await request(makeApp({ userId: 'someone-else', role: 'citizen' }))
+        .get('/api/incidents/incident-uuid-1');
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('returns 200 with incident data for an admin', async () => {
+      const res = await request(makeApp({ userId: 'admin-1', role: 'admin' }))
+        .get('/api/incidents/incident-uuid-1');
       expect(res.statusCode).toBe(200);
       expect(res.body.data).toHaveProperty('id', 'incident-uuid-1');
     });

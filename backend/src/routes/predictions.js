@@ -8,6 +8,8 @@ const { RIVER_STATIONS } = require('../services/cwc');
 // Seismic zone lookup from NCS service
 const { getSeismicZone } = require('../services/ncs');
 
+const { strictLimiter, standardLimiter } = require('../middleware/rateLimiter');
+
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://127.0.0.1:8000';
 
 // â”€â”€ District â†’ approximate lat/lon for prediction lookups â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -49,7 +51,15 @@ function getDistrictCoords(district) {
 }
 
 // â”€â”€ POST /api/predictions/misinformation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-router.post('/misinformation', async (req, res) => {
+// SECURITY: this is an UNAUTHENTICATED endpoint that both burns ML compute and
+// INSERTs a row into misinformation_checks on every call — an anonymous write
+// path, i.e. a database-flooding and cost-amplification vector. It has to stay
+// public (the Fact-Check tab on the public portal uses it), so it gets the
+// strict write limiter instead: 30 requests / 15 min / IP.
+//
+// middleware/rateLimiter.js already exported strictLimiter but nothing ever
+// imported it — the module was dead code.
+router.post('/misinformation', strictLimiter, async (req, res) => {
   try {
     const { text, source } = req.body;
     if (!text || text.trim().length < 10) {
@@ -111,7 +121,11 @@ router.post('/misinformation', async (req, res) => {
 });
 
 // â”€â”€ GET /api/predictions/misinformation/history â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-router.get('/misinformation/history', async (req, res) => {
+router.get('/misinformation/history', standardLimiter, async (req, res) => {
+  // PRIVACY: this returns text other people submitted for checking. Full
+  // input_text was previously exposed to anonymous callers; coordinators and
+  // admins still get it, everyone else gets a truncated preview.
+  const privileged = req.userRole === 'coordinator' || req.userRole === 'admin';
   try {
     const { data, error } = await getAdminDb()
       .from('misinformation_checks')
@@ -119,7 +133,16 @@ router.get('/misinformation/history', async (req, res) => {
       .order('analyzed_at', { ascending: false })
       .limit(20);
     if (error) throw error;
-    res.json({ data });
+
+    const rows = privileged
+      ? data
+      : (data || []).map((r) => ({
+          ...r,
+          input_text: (r.input_text || '').slice(0, 120)
+            + ((r.input_text || '').length > 120 ? '…' : ''),
+        }));
+
+    res.json({ data: rows });
   } catch (error) {
     console.error('[Predictions] History fetch error:', error.message);
     res.status(500).json({ error: 'Failed to fetch history.' });
@@ -128,7 +151,7 @@ router.get('/misinformation/history', async (req, res) => {
 
 // â”€â”€ GET /api/predictions/flood/:basinId â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // M1 FIX: Fetch real GloFAS discharge from Open-Meteo for the matched station.
-router.get('/flood/:basinId', async (req, res) => {
+router.get('/flood/:basinId', standardLimiter, async (req, res) => {
   try {
     const { basinId } = req.params;
 
@@ -190,7 +213,7 @@ router.get('/flood/:basinId', async (req, res) => {
 
 // â”€â”€ GET /api/predictions/earthquake/:district â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // M1 FIX: Fetch real USGS earthquake history for the district's coordinates.
-router.get('/earthquake/:district', async (req, res) => {
+router.get('/earthquake/:district', standardLimiter, async (req, res) => {
   try {
     const { district } = req.params;
 
@@ -247,7 +270,7 @@ router.get('/earthquake/:district', async (req, res) => {
 
 // â”€â”€ GET /api/predictions/heatwave/:district â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // M1 FIX: Fetch real temperature data from Open-Meteo and compute anomalies.
-router.get('/heatwave/:district', async (req, res) => {
+router.get('/heatwave/:district', standardLimiter, async (req, res) => {
   try {
     const { district } = req.params;
 

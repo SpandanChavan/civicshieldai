@@ -73,14 +73,35 @@ router.get('/pending', async (req, res) => {
 
 // ── GET /api/incidents/:id ────────────────────────────
 router.get('/:id', async (req, res) => {
+  // PRIVACY: this had no authentication at all while returning `*` — which
+  // since migration 011 includes reporter_name and reporter_contact, plus the
+  // reporter's exact PostGIS location. Anyone with an incident UUID could pull
+  // a citizen's name, phone number and coordinates.
+  //
+  // Access now mirrors GET /api/incidents (the list endpoint), which was
+  // already scoped correctly: owner, coordinator of that state, or admin.
+  if (!req.userId) {
+    return res.status(401).json({ error: 'Authentication required' });
+  }
+
   try {
     const { data, error } = await getDb()
       .from('incident_reports')
       .select('*')
       .eq('id', req.params.id)
-      .single();
+      .maybeSingle();
     if (error) throw error;
     if (!data) return res.status(404).json({ error: 'Incident not found' });
+
+    const isOwner       = data.reporter_id === req.userId;
+    const isCoordinator = req.userRole === 'coordinator' && data.state_id === req.userStateId;
+    const isAdmin       = req.userRole === 'admin';
+    const isResponder   = req.userRole === 'responder';
+
+    if (!isOwner && !isCoordinator && !isAdmin && !isResponder) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
     res.json({ data });
   } catch (e) {
     res.status(500).json({ error: e.message });

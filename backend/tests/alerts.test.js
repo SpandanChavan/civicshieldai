@@ -33,11 +33,15 @@ jest.mock('../src/services/notificationRouter', () => ({
 
 const alertsRouter = require('../src/routes/alerts');
 
-function makeApp({ userId, role } = {}) {
+function makeApp({ userId, role, stateId } = {}) {
   const app = express();
   app.use(express.json());
   app.use((req, _res, next) => {
-    if (userId) { req.userId = userId; req.userRole = role; }
+    if (userId) {
+      req.userId      = userId;
+      req.userRole    = role;
+      req.userStateId = stateId;
+    }
     next();
   });
   app.use('/api/alerts', alertsRouter);
@@ -67,10 +71,21 @@ describe('Alerts API', () => {
       expect(res.statusCode).toBe(403);
     });
 
-    it('returns 200 when called by a coordinator', async () => {
-      const res = await request(makeApp({ userId: 'coord-1', role: 'coordinator' }))
+    it('returns 200 when called by a coordinator in their own state', async () => {
+      const res = await request(makeApp({ userId: 'coord-1', role: 'coordinator', stateId: 'state-MH' }))
         .delete('/api/alerts/alert-1');
       expect(res.statusCode).toBe(200);
+    });
+
+    // DELETE is now state-scoped. A coordinator with no state assignment has no
+    // jurisdiction, so they cannot delete — this matches the rule POST /api/alerts
+    // has always enforced ("State assignment required to create alerts").
+    // Previously this case returned 200 and let a stateless coordinator delete
+    // ANY state's alert.
+    it('returns 403 for a coordinator with no state assignment', async () => {
+      const res = await request(makeApp({ userId: 'coord-2', role: 'coordinator' }))
+        .delete('/api/alerts/alert-1');
+      expect(res.statusCode).toBe(403);
     });
 
     it('returns 200 when called by an admin', async () => {

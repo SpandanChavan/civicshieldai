@@ -45,14 +45,32 @@ router.get('/', async (req, res) => {
 
 // ── GET /api/alerts/:id ───────────────────────────────
 router.get('/:id', async (req, res) => {
+  // PRIVACY: this used to return `*, alert_logs(*)` to ANY caller, with no
+  // authentication. alert_logs.recipient stores the email address, phone
+  // number or Telegram chat id of every person an alert was delivered to — so
+  // anyone holding (or guessing) an alert UUID could enumerate the recipient
+  // list of an emergency broadcast.
+  //
+  // Delivery logs are an operational detail: only coordinators and admins get
+  // them, and coordinators only for their own state. Everyone else gets the
+  // alert itself, which is public information by design (RLS policy
+  // "Public read sent alerts").
+  const privileged = req.userRole === 'coordinator' || req.userRole === 'admin';
+
   try {
     const { data, error } = await getDb()
       .from('alerts')
-      .select('*, alert_logs(*)')
+      .select(privileged ? '*, alert_logs(*)' : '*')
       .eq('id', req.params.id)
-      .single();
+      .maybeSingle();
     if (error) throw error;
     if (!data) return res.status(404).json({ error: 'Alert not found' });
+
+    // A coordinator must not read another state's delivery logs.
+    if (data.alert_logs && req.userRole === 'coordinator' && data.state_id !== req.userStateId) {
+      delete data.alert_logs;
+    }
+
     res.json({ data });
   } catch (e) {
     res.status(500).json({ error: e.message });
@@ -114,16 +132,25 @@ router.post('/', async (req, res) => {
     // Create alert as 'draft'
     const { data: alert, error } = await db
       .from('alerts')
-      .insert({ ...alertData, status: 'draft', state_id: req.body.state_id })
+      .insert({
+        ...alertData,
+        status: 'draft',
+        state_id: req.body.state_id,
+        // ATTRIBUTION: the alerts table has had a created_by column since
+        // migration 001, but nothing ever populated it — so there was no record
+        // of which coordinator sent any given emergency broadcast. The audit
+        // entry below had the same gap (it hardcoded null).
+        created_by: req.userId || null,
+      })
       .select()
       .single();
     if (error) throw error;
 
     // Log audit action asynchronously
-    // Alert creators don't pass an explicit reporter_id in this schema currently, so userId is null
-    logAudit('ALERT_CREATED', null, alert.id, { 
+    logAudit('ALERT_CREATED', req.userId || null, alert.id, {
       title: alert.title,
-      severity: alert.severity 
+      severity: alert.severity,
+      state_id: req.body.state_id || null,
     });
 
     // Send via channels asynchronously
@@ -167,8 +194,21 @@ router.delete('/:id', async (req, res) => {
     return res.status(403).json({ error: 'Forbidden: Coordinators and admins only' });
   }
   try {
-    const { error } = await getDb().from('alerts').delete().eq('id', req.params.id);
+    // TENANCY: coordinators delete only their own state's alerts. Without this
+    // a coordinator could delete another state's outgoing emergency alert.
+    let query = getDb().from('alerts').delete().eq('id', req.params.id);
+    if (req.userRole === 'coordinator') {
+      if (!req.userStateId) {
+        return res.status(403).json({ error: 'State assignment required' });
+      }
+      query = query.eq('state_id', req.userStateId);
+    }
+
+    const { data, error } = await query.select('id');
     if (error) throw error;
+    if (!data || data.length === 0) {
+      return res.status(404).json({ error: 'Alert not found in your jurisdiction' });
+    }
     logAudit('ALERT_DELETED', req.userId, req.params.id, {});
     res.json({ message: 'Alert deleted' });
   } catch (e) {

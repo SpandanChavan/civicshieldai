@@ -1,12 +1,8 @@
 const express = require('express');
-const { createClient } = require('@supabase/supabase-js');
 const { z } = require('zod');
 const { logAudit } = require('../utils/auditLogger');
+const { getAdminDb: getDb } = require('../lib/db');
 const router = express.Router();
-
-function getDb() {
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-}
 
 const ResourceSchema = z.object({
   name: z.string().min(2).max(200),
@@ -64,7 +60,7 @@ router.post('/', async (req, res) => {
       .single();
     if (error) throw error;
 
-    logAudit('RESOURCE_CREATED', null, data.id, { 
+    logAudit('RESOURCE_CREATED', req.userId, data.id, { 
       type: data.type, 
       assigned_event: data.assigned_event 
     });
@@ -82,6 +78,14 @@ const ResourceUpdateSchema = ResourceSchema.partial().extend({
 }).strict();
 
 router.patch('/:id', async (req, res) => {
+  // SECURITY: PATCH previously had no auth check at all — any caller could
+  // reassign or relocate any resource in any state. Now gated on role AND
+  // scoped to the coordinator's own state (admins are unrestricted).
+  if (!req.userId) return res.status(401).json({ error: 'Authentication required' });
+  if (req.userRole !== 'coordinator' && req.userRole !== 'admin') {
+    return res.status(403).json({ error: 'Forbidden: Coordinators and admins only' });
+  }
+
   const parsed = ResourceUpdateSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Validation failed', details: parsed.error.errors });
@@ -96,16 +100,25 @@ router.patch('/:id', async (req, res) => {
   };
 
   try {
-    const { data, error } = await getDb()
-      .from('resources')
-      .update(updates)
-      .eq('id', req.params.id)
-      .select()
-      .single();
-    if (error) throw error;
+    // Tenancy: a coordinator may only touch rows inside their own state.
+    // Applying .eq('state_id', ...) to the UPDATE itself makes the check
+    // atomic — no separate SELECT, no TOCTOU window, one round-trip.
+    let query = getDb().from('resources').update(updates).eq('id', req.params.id);
+    if (req.userRole === 'coordinator') {
+      if (!req.userStateId) {
+        return res.status(403).json({ error: 'State assignment required to manage resources' });
+      }
+      query = query.eq('state_id', req.userStateId);
+    }
 
-    if (req.body.assigned_event) {
-      logAudit('RESOURCE_ASSIGNED', null, data.id, { assigned_event: req.body.assigned_event });
+    const { data, error } = await query.select().maybeSingle();
+    if (error) throw error;
+    if (!data) {
+      return res.status(404).json({ error: 'Resource not found in your jurisdiction' });
+    }
+
+    if (parsed.data.assigned_event) {
+      logAudit('RESOURCE_ASSIGNED', req.userId, data.id, { assigned_event: parsed.data.assigned_event });
     }
 
     res.json({ data });
@@ -124,8 +137,20 @@ router.delete('/:id', async (req, res) => {
   if (!req.userId) return res.status(401).json({ error: 'Authentication required' });
   if (req.userRole !== 'coordinator' && req.userRole !== 'admin') return res.status(403).json({ error: 'Forbidden' });
   try {
-    const { error } = await getDb().from('resources').delete().eq('id', req.params.id);
+    // Same tenancy rule as PATCH: coordinators delete only within their state.
+    let query = getDb().from('resources').delete().eq('id', req.params.id);
+    if (req.userRole === 'coordinator') {
+      if (!req.userStateId) {
+        return res.status(403).json({ error: 'State assignment required to manage resources' });
+      }
+      query = query.eq('state_id', req.userStateId);
+    }
+    const { data, error } = await query.select('id');
     if (error) throw error;
+    if (!data || data.length === 0) {
+      return res.status(404).json({ error: 'Resource not found in your jurisdiction' });
+    }
+    logAudit('RESOURCE_DELETED', req.userId, req.params.id, {});
     res.json({ message: 'Resource deleted' });
   } catch (e) {
     res.status(500).json({ error: e.message });

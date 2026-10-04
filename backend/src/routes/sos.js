@@ -399,6 +399,17 @@ router.patch('/:id/acknowledge', async (req, res, next) => {
 
     if (fetchErr) throw fetchErr;
     if (!existing) return res.status(404).json({ error: 'SOS request not found.' });
+
+    // TENANCY: state_id was selected above but never checked, so a coordinator
+    // in one state could acknowledge an SOS belonging to another. For a
+    // life-safety queue that is worse than a plain permissions bug: the SOS
+    // flips to "acknowledged" and drops out of the owning state's active list
+    // while nobody with local responders is actually on it.
+    // Admins and responders stay national by design (see GET /api/sos).
+    if (req.userRole === 'coordinator' && existing.state_id !== req.userStateId) {
+      return res.status(403).json({ error: 'Forbidden: SOS belongs to another state.' });
+    }
+
     if (existing.status !== 'active') {
       return res.status(400).json({
         error: `Cannot acknowledge SOS with status "${existing.status}". Only active SOS can be acknowledged.`,
@@ -454,12 +465,18 @@ router.patch('/:id/resolve', async (req, res, next) => {
     
     const { data: existing, error: fetchErr } = await db
       .from('sos_requests')
-      .select('id, status, user_id')
+      .select('id, status, user_id, state_id')
       .eq('id', req.params.id)
       .maybeSingle();
 
     if (fetchErr) throw fetchErr;
     if (!existing) return res.status(404).json({ error: 'SOS request not found.' });
+
+    // TENANCY: same rule as /acknowledge — coordinators are state-bound.
+    if (req.userRole === 'coordinator' && existing.state_id !== req.userStateId) {
+      return res.status(403).json({ error: 'Forbidden: SOS belongs to another state.' });
+    }
+
     if (existing.status === 'resolved' || existing.status === 'cancelled') {
       return res.status(400).json({ error: `Cannot resolve SOS with status "${existing.status}".` });
     }

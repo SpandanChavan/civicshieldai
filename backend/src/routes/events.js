@@ -1,33 +1,14 @@
 const express = require('express');
-const { createClient } = require('@supabase/supabase-js');
 const { z } = require('zod');
 const { cacheMiddleware } = require('../middleware/cache');
+const { getAdminDb: getDb } = require('../lib/db');
+const { parseWkbPoint } = require('../utils/geoHelpers');
 const router = express.Router();
 
-function getDb() {
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-}
-
-/**
- * Parse PostGIS EWKB hex string into { lat, lon }.
- * PostGIS geography columns are returned as EWKB binary (not WKT) by the REST API.
- * EWKB layout: 1B byte-order + 4B type + 4B SRID + 8B lon + 8B lat = 21 bytes = 50 hex chars
- */
-function parseWkbPoint(hex) {
-  if (!hex || typeof hex !== 'string' || hex.length < 42) return null;
-  try {
-    const isLE = hex.slice(0, 2) === '01';
-    // EWKB (with SRID) has 18 hex chars of header; plain WKB has 10
-    const hasSrid = hex.length >= 50;
-    const offset = hasSrid ? 18 : 10;
-    const lonBuf = Buffer.from(hex.slice(offset, offset + 16), 'hex');
-    const latBuf = Buffer.from(hex.slice(offset + 16, offset + 32), 'hex');
-    const lon = isLE ? lonBuf.readDoubleLE(0) : lonBuf.readDoubleBE(0);
-    const lat = isLE ? latBuf.readDoubleLE(0) : latBuf.readDoubleBE(0);
-    if (isNaN(lat) || isNaN(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
-    return { lat, lon };
-  } catch { return null; }
-}
+// NOTE: parseWkbPoint used to be copy-pasted into this file, byte-identical to
+// the one in utils/geoHelpers.js. Two copies of a binary decoder is exactly the
+// kind of thing that silently diverges, so this now imports the single source.
+// PostGIS geography columns come back from the REST API as EWKB hex, not WKT.
 
 /** Attach lat/lon to each event object for frontend map rendering. */
 function withCoords(events) {
@@ -161,13 +142,24 @@ router.patch('/:id/deactivate', async (req, res) => {
   if (!req.userId) return res.status(401).json({ error: 'Authentication required' });
   if (req.userRole !== 'coordinator' && req.userRole !== 'admin') return res.status(403).json({ error: 'Forbidden' });
   try {
-    const { data, error } = await getDb()
+    // TENANCY: a coordinator may only deactivate events inside their own
+    // state. Applying the filter to the UPDATE keeps it atomic (no separate
+    // SELECT, no TOCTOU window); admins remain nationwide.
+    let query = getDb()
       .from('events')
       .update({ is_active: false, updated_at: new Date().toISOString() })
-      .eq('id', req.params.id)
-      .select()
-      .single();
+      .eq('id', req.params.id);
+
+    if (req.userRole === 'coordinator') {
+      if (!req.userStateId) {
+        return res.status(403).json({ error: 'State assignment required' });
+      }
+      query = query.eq('state_id', req.userStateId);
+    }
+
+    const { data, error } = await query.select().maybeSingle();
     if (error) throw error;
+    if (!data) return res.status(404).json({ error: 'Event not found in your jurisdiction' });
     res.json({ data });
   } catch (e) {
     res.status(500).json({ error: e.message });
