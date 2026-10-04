@@ -454,14 +454,20 @@ BEGIN
   RETURN QUERY
   SELECT
     r.id,
-    r.name,
-    r.type,
-    r.status,
+    -- The ::TEXT casts are REQUIRED, not cosmetic: resources.name/type/status/
+    -- contact/notes are VARCHAR, while RETURNS TABLE declares them TEXT. Without
+    -- the casts Postgres raises "structure of query does not match function
+    -- result type" at call time and the SOS safe-zone lookup fails outright.
+    r.name::TEXT,
+    r.type::TEXT,
+    r.status::TEXT,
     r.quantity,
-    r.contact,
-    r.notes,
+    r.contact::TEXT,
+    r.notes::TEXT,
+    -- Extract lat/lon back from the GEOGRAPHY column for the frontend
     ST_Y(r.location::geometry)::FLOAT  AS latitude,
     ST_X(r.location::geometry)::FLOAT  AS longitude,
+    -- Haversine distance in meters using PostGIS geography type
     ST_Distance(
       r.location,
       ST_SetSRID(ST_MakePoint(p_longitude, p_latitude), 4326)::geography
@@ -469,7 +475,7 @@ BEGIN
     r.state_id
   FROM resources r
   WHERE
-    r.type IN ('shelter', 'hospital', 'relief_camp', 'medical', 'food', 'rescue')
+    r.type IN ('shelter', 'medical', 'food', 'water', 'rescue_team', 'hospital', 'relief_camp')
     AND r.status = 'available'
     AND r.quantity > 0
   ORDER BY distance_meters ASC
