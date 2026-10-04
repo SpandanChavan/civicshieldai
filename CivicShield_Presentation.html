@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CivicShield AI — Final Evaluation Deck</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  :root{
+    --bg:#0B1220;
+    --surface:#131C2E;
+    --surface2:#1B2740;
+    --line:rgba(148,163,184,.16);
+    --amber:#F59E0B;
+    --red:#EF4444;
+    --green:#10B981;
+    --blue:#3B82F6;
+    --violet:#8B5CF6;
+    --text:#F8FAFC;
+    --muted:#94A3B8;
+    --dim:#64748B;
+  }
+
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{background:#05090F;font-family:'Inter',sans-serif;color:var(--text);}
+
+  .deck{width:100%;}
+
+  .slide{
+    width:1280px;height:720px;margin:0 auto 28px;position:relative;
+    background:var(--bg);overflow:hidden;
+    display:flex;flex-direction:column;
+    padding:52px 64px;
+    border:1px solid rgba(148,163,184,.10);
+  }
+
+  /* ---------- shared type ---------- */
+  .kicker{
+    font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
+    color:var(--amber);margin-bottom:14px;
+  }
+  h1{font-size:60px;font-weight:900;line-height:1.02;letter-spacing:-.03em}
+  h2{font-size:38px;font-weight:800;line-height:1.1;letter-spacing:-.02em;margin-bottom:8px}
+  .sub{font-size:16px;color:var(--muted);font-weight:400;line-height:1.55;margin-bottom:26px;max-width:900px}
+  p{font-size:15px;line-height:1.6;color:var(--muted)}
+  strong{color:var(--text);font-weight:600}
+  .mono{font-family:'JetBrains Mono',monospace}
+
+  .slideno{
+    position:absolute;bottom:22px;right:30px;font-size:11px;color:var(--dim);
+    font-family:'JetBrains Mono',monospace;letter-spacing:.05em;
+  }
+  .brandmark{
+    position:absolute;bottom:22px;left:64px;font-size:11px;color:var(--dim);
+    letter-spacing:.16em;text-transform:uppercase;font-weight:600;
+  }
+
+  /* ---------- title slide ---------- */
+  .title-slide{justify-content:center;background:
+    radial-gradient(circle at 78% 22%, rgba(245,158,11,.16), transparent 46%),
+    radial-gradient(circle at 12% 84%, rgba(59,130,246,.14), transparent 46%),
+    var(--bg);}
+  .shield-badge{
+    width:66px;height:66px;border-radius:17px;background:linear-gradient(135deg,var(--amber),#EA580C);
+    display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:26px;
+    box-shadow:0 12px 40px rgba(245,158,11,.34);
+  }
+  .title-slide h1{font-size:82px;margin-bottom:16px}
+  .title-slide .tagline{font-size:21px;color:#CBD5E1;font-weight:400;max-width:780px;line-height:1.5}
+  .title-meta{display:flex;gap:12px;margin-top:38px;flex-wrap:wrap}
+  .chip{
+    padding:8px 16px;border:1px solid var(--line);border-radius:999px;
+    font-size:12.5px;color:#CBD5E1;font-weight:500;background:rgba(255,255,255,.03);
+  }
+  .chip.hot{border-color:rgba(245,158,11,.5);color:var(--amber);background:rgba(245,158,11,.08)}
+
+  /* ---------- generic layout helpers ---------- */
+  .body{flex:1;display:flex;flex-direction:column;min-height:0}
+  .cols{display:grid;gap:20px}
+  .c2{grid-template-columns:1fr 1fr}
+  .c3{grid-template-columns:repeat(3,1fr)}
+  .c4{grid-template-columns:repeat(4,1fr)}
+  .c25{grid-template-columns:1.25fr 1fr}
+  .c31{grid-template-columns:1.6fr 1fr}
+
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px 22px;
+  }
+  .card h3{font-size:16px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:9px}
+  .card p{font-size:13.5px;line-height:1.55}
+  .ico{
+    width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+    font-size:15px;flex-shrink:0;
+  }
+  .i-amber{background:rgba(245,158,11,.15);color:var(--amber)}
+  .i-red{background:rgba(239,68,68,.15);color:var(--red)}
+  .i-green{background:rgba(16,185,129,.15);color:var(--green)}
+  .i-blue{background:rgba(59,130,246,.15);color:var(--blue)}
+  .i-violet{background:rgba(139,92,246,.15);color:var(--violet)}
+
+  /* ---------- stats ---------- */
+  .statgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-bottom:24px}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:22px}
+  .stat .num{font-size:44px;font-weight:900;letter-spacing:-.03em;line-height:1;margin-bottom:7px}
+  .stat .lbl{font-size:12.5px;color:var(--muted);line-height:1.4}
+  .n-amber{color:var(--amber)} .n-red{color:var(--red)}
+  .n-green{color:var(--green)} .n-blue{color:var(--blue)}
+  .n-violet{color:var(--violet)}
+
+  /* ---------- table ---------- */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th{
+    text-align:left;padding:11px 14px;font-size:11px;font-weight:700;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--line);
+  }
+  td{padding:11px 14px;border-bottom:1px solid rgba(148,163,184,.08);color:#CBD5E1;vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  .yes{color:var(--green);font-weight:700}
+  .no{color:var(--red);font-weight:700}
+  .part{color:var(--amber);font-weight:700}
+  .tbl-wrap{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+
+  /* ---------- lists ---------- */
+  ul.clean{list-style:none}
+  ul.clean li{
+    font-size:14px;color:#CBD5E1;line-height:1.5;padding-left:22px;position:relative;margin-bottom:11px;
+  }
+  ul.clean li::before{
+    content:'';position:absolute;left:0;top:7px;width:7px;height:7px;border-radius:2px;background:var(--amber);
+  }
+  ul.clean.g li::before{background:var(--green)}
+  ul.clean.b li::before{background:var(--blue)}
+  ul.clean.r li::before{background:var(--red)}
+
+  /* ---------- architecture ---------- */
+  .arch{display:flex;flex-direction:column;gap:11px;flex:1;justify-content:center}
+  .layer{
+    background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 18px;
+  }
+  .layer-h{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin-bottom:9px}
+  .nodes{display:flex;gap:8px;flex-wrap:wrap}
+  .node{
+    background:var(--surface2);border:1px solid var(--line);border-radius:8px;
+    padding:7px 12px;font-size:12px;color:#CBD5E1;font-weight:500;
+  }
+  .node.acc{border-color:rgba(245,158,11,.4);color:var(--amber);background:rgba(245,158,11,.07)}
+  .flowdown{text-align:center;color:var(--dim);font-size:15px;line-height:1}
+
+  /* ---------- feature rows ---------- */
+  .frow{display:flex;gap:14px;align-items:flex-start;margin-bottom:15px}
+  .frow .ico{width:34px;height:34px;font-size:16px;border-radius:10px}
+  .frow-t{font-size:14.5px;font-weight:700;margin-bottom:3px}
+  .frow-d{font-size:13px;color:var(--muted);line-height:1.5}
+
+  /* ---------- timeline ---------- */
+  .flow{display:flex;gap:10px;align-items:stretch}
+  .step{flex:1;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px 15px;position:relative}
+  .step-n{
+    width:25px;height:25px;border-radius:7px;background:rgba(245,158,11,.15);color:var(--amber);
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;margin-bottom:10px;
+  }
+  .step-t{font-size:13.5px;font-weight:700;margin-bottom:5px;line-height:1.25}
+  .step-d{font-size:11.5px;color:var(--muted);line-height:1.45}
+
+  /* ---------- section divider ---------- */
+  .section-slide{justify-content:center;align-items:flex-start;background:
+    radial-gradient(circle at 82% 50%, rgba(245,158,11,.13), transparent 50%),var(--bg);}
+  .section-slide h1{font-size:66px}
+  .section-num{font-size:15px;font-family:'JetBrains Mono',monospace;color:var(--amber);margin-bottom:16px;letter-spacing:.1em}
+
+  /* ---------- code ---------- */
+  .code{
+    background:#0A101C;border:1px solid var(--line);border-radius:11px;padding:15px 17px;
+    font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.65;color:#94A3B8;
+  }
+  .code .k{color:var(--amber)} .code .s{color:var(--green)} .code .c{color:var(--dim)}
+
+  .note{
+    background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.28);border-radius:11px;
+    padding:14px 17px;font-size:13.5px;color:#E2E8F0;line-height:1.55;
+  }
+  .note.g{background:rgba(16,185,129,.07);border-color:rgba(16,185,129,.28)}
+  .note.r{background:rgba(239,68,68,.07);border-color:rgba(239,68,68,.28)}
+
+  .pill{
+    display:inline-block;padding:3px 9px;border-radius:5px;font-size:10.5px;font-weight:700;
+    letter-spacing:.05em;text-transform:uppercase;
+  }
+  .p-live{background:rgba(16,185,129,.16);color:var(--green)}
+  .p-rule{background:rgba(245,158,11,.16);color:var(--amber)}
+
+  /* ---------- print ---------- */
+  @media print{
+    @page{size:1280px 720px;margin:0}
+    html,body{background:#fff}
+    .slide{margin:0;page-break-after:always;border:none;box-shadow:none}
+    .noprint{display:none!important}
+  }
+
+  .helpbar{
+    position:fixed;bottom:16px;left:50%;transform:translateX(-50%);
+    background:rgba(19,28,46,.94);border:1px solid var(--line);border-radius:999px;
+    padding:9px 20px;font-size:12px;color:var(--muted);z-index:99;backdrop-filter:blur(8px);
+  }
+  .helpbar b{color:var(--amber)}
+</style>
+</head>
+<body>
+<div class="deck">
+
+<!-- ============ 1 · TITLE ============ -->
+<section class="slide title-slide">
+  <div class="shield-badge">🛡️</div>
+  <h1>CivicShield&nbsp;AI</h1>
+  <p class="tagline">A real-time, AI-assisted disaster management platform for India — unifying fragmented hazard feeds into one live operational picture for citizens, state coordinators, and national administrators.</p>
+  <div class="title-meta">
+    <span class="chip hot">8 Live Data Sources</span>
+    <span class="chip">React · Node · FastAPI · PostGIS</span>
+    <span class="chip">Real-Time Socket.io</span>
+    <span class="chip">Multi-Channel Alerting</span>
+    <span class="chip">Installable PWA</span>
+  </div>
+  <div class="brandmark">Final Project Evaluation</div>
+  <div class="slideno">01</div>
+</section>
+
+<!-- ============ 2 · PROBLEM ============ -->
+<section class="slide">
+  <div class="kicker">The Problem</div>
+  <h2>India is among the world's most disaster-prone nations — <br>yet its hazard data is fragmented and invisible to citizens</h2>
+  <div class="body">
+    <div class="statgrid" style="margin-top:14px">
+      <div class="stat"><div class="num n-red">58%</div><div class="lbl">of India's landmass is earthquake-prone (BIS Zones III–V)</div></div>
+      <div class="stat"><div class="num n-blue">12%</div><div class="lbl">of land is flood-prone — 40M+ hectares annually</div></div>
+      <div class="stat"><div class="num n-amber">7,516</div><div class="lbl">km of coastline exposed to cyclones on both seaboards</div></div>
+      <div class="stat"><div class="num n-violet">36</div><div class="lbl">States &amp; UTs each needing independent coordination</div></div>
+    </div>
+    <div class="cols c3" style="flex:1">
+      <div class="card">
+        <h3><span class="ico i-red">🔌</span>No Public APIs</h3>
+        <p>NDMA's SACHET is a client-rendered Next.js site. IMD, NCS, and CWC portals expose no server-side API. Authoritative data exists — but is <strong>machine-unreadable</strong>.</p>
+      </div>
+      <div class="card">
+        <h3><span class="ico i-amber">🧩</span>Fragmented Sources</h3>
+        <p>Seismic, flood, fire, and weather data live in <strong>separate silos</strong> with different formats, projections, and update cadences. No single operational picture exists.</p>
+      </div>
+      <div class="card">
+        <h3><span class="ico i-blue">👥</span>Citizens Locked Out</h3>
+        <p>Existing government systems are <strong>credential-gated</strong> for officials. The public — the people actually at risk — have no real-time hazard view or reporting channel.</p>
+      </div>
+    </div>
+  </div>
+  <div class="brandmark">CivicShield AI</div>
+  <div class="slideno">02</div>
+</section>
+
+<!-- ============ 3 · SOLUTION ============ -->
+<section class="slide">
+  <div class="kicker">Our Solution</div>
+  <h2>One platform. Three audiences. Real-time by design.</h2>
+  <p class="sub">CivicShield AI continuously ingests hazard data from 8 authoritative sources, normalizes it into a single deduplicated geospatial event model, enriches it with AI, and pushes it live to the people who need it — in seconds.</p>
+  <div class="body">
+    <div class="cols c3" style="flex:1">
+      <div class="card" style="border-color:rgba(59,130,246,.3)">
+        <h3><span class="ico i-blue">🧑‍🤝‍🧑</span>For Citizens</h3>
+        <ul class="clean b" style="margin-top:12px">
+          <li>Live public hazard map — <strong>no login required</strong></li>
+          <li>Submit geo-tagged incident reports with photos</li>
+          <li>One-tap <strong>SOS emergency</strong> with location</li>
+          <li>Push alerts in 7 Indian languages</li>
+          <li>Installable PWA — works offline</li>
+        </ul>
+      </div>
+      <div class="card" style="border-color:rgba(245,158,11,.3)">
+        <h3><span class="ico i-amber">🎛️</span>For Coordinators</h3>
+        <ul class="clean" style="margin-top:12px">
+          <li><strong>State-scoped</strong> operational dashboard</li>
+          <li>Review queue — approve reports into live events</li>
+          <li>Author &amp; dispatch multi-channel alerts</li>
+          <li>Manage emergency resources &amp; deployment</li>
+          <li>Live ingestion health monitoring</li>
+        </ul>
+      </div>
+      <div class="card" style="border-color:rgba(139,92,246,.3)">
+        <h3><span class="ico i-violet">🏛️</span>For Administrators</h3>
+        <ul class="clean" style="margin-top:12px">
+          <li>Nationwide oversight across all 36 states</li>
+          <li>Aggregate statistics &amp; per-state breakdown</li>
+          <li>Assign coordinators to jurisdictions</li>
+          <li>Full <strong>audit log</strong> of every action</li>
+          <li>User &amp; role management</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="brandmark">CivicShield AI</div>
+  <div class="slideno">03</div>
+</section>
+
+<!-- ============ 4 · ARCHITECTURE ============ -->
+<section class="slide">
+  <div class="kicker">Technical Implementation</div>
+  <h2>System Architecture</h2>
+  <div class="body">
+    <div class="arch">
+      <div class="layer" style="border-color:rgba(59,130,246,.32)">
+        <div class="layer-h" style="color:var(--blue)">① External Data Sources — polled on independent cron schedules</div>
+        <div class="nodes">
+          <span class="node">USGS FDSN</span><span class="node">NASA FIRMS</span><span class="node">GDACS</span>
+          <span class="node">NASA EONET</span><span class="node">Open-Meteo</span><span class="node">GloFAS Flood</span>
+          <span class="node">FloodList RSS</span><span class="node">NCS via India BBox</span>
+        </div>
+      </div>
+      <div class="flowdown">▼</div>
+      <div class="layer" style="border-color:rgba(245,158,11,.32)">
+        <div class="layer-h" style="color:var(--amber)">② Backend — Node.js · Express · Socket.io</div>
+        <div class="nodes">
+          <span class="node acc">apiPollers.js — fetch · normalize · dedup</span>
+          <span class="node">stateScope middleware (JWT → role/state)</span>
+          <span class="node">7 REST routers</span>
+          <span class="node">notificationRouter — 5 channels</span>
+          <span class="node">Redis cache</span>
+        </div>
+      </div>
+      <div class="flowdown">▼</div>
+      <div class="cols c3" style="gap:11px">
+        <div class="layer" style="border-color:rgba(16,185,129,.32)">
+          <div class="layer-h" style="color:var(--green)">③ Database</div>
+          <div class="nodes"><span class="node">PostgreSQL</span><span class="node">PostGIS</span><span class="node">Row-Level Security</span></div>
+        </div>
+        <div class="layer" style="border-color:rgba(139,92,246,.32)">
+          <div class="layer-h" style="color:var(--violet)">④ ML Service</div>
+          <div class="nodes"><span class="node">Prophet</span><span class="node">OR-Tools</span><span class="node">HF Vision</span></div>
+        </div>
+        <div class="layer" style="border-color:rgba(239,68,68,.32)">
+          <div class="layer-h" style="color:var(--red)">⑤ Real-Time</div>
+          <div class="nodes"><span class="node">Socket.io rooms</span><span class="node">Supabase Realtime</span></div>
+        </div>
+      </div>
+      <div class="flowdown">▼</div>
+      <div class="layer" style="border-color:rgba(148,163,184,.3)">
+        <div class="layer-h">⑥ Frontend — React 18 · Vite · Leaflet · Zustand · TanStack Query</div>
+        <div class="nodes">
+          <span class="node">Public Portal</span><span class="node">Citizen Portal</span>
+          <span class="node">Coordinator Dashboard</span><span class="node">Admin Console</span><span class="node">PWA + Service Worker</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="brandmark">CivicShield AI</div>
+  <div class="slideno">04</div>
+</section>
+
+<!-- ============ 5 · TECH STACK ============ -->
+<section class="slide">
+  <div class="kicker">Technical Implementation</div>
+  <h2>Technology Stack</h2>
+  <p class="sub">Every choice made for a specific operational reason — not for novelty.</p>
+  <div class="body">
+    <div class="cols c4" style="flex:1">
+      <div class="card">
+        <h3><span class="ico i-amber">⚙️</span>Backend</h3>
+        <ul class="clean" style="margin-top:10px;font-size:12.5px">
+          <li>Node.js 20 + Express 4</li>
+          <li>Socket.io 4 — live push</li>
+          <li>node-cron — 9 schedules</li>
+          <li>Zod — request validation</li>
+          <li>Helmet + rate limiting</li>
+          <li>Upstash Redis cache</li>
+          <li>Sentry monitoring</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="ico i-violet">🧠</span>ML Service</h3>
+        <ul class="clean" style="margin-top:10px;font-size:12.5px">
+          <li>Python + FastAPI</li>
+          <li>Prophet — forecasting</li>
+          <li>Google OR-Tools — VRP</li>
+          <li>HuggingFace Inference</li>
+          <li>Pydantic schemas</li>
+          <li>Graceful fallbacks</li>
+          <li>Swagger at <span class="mono">/docs</span></li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="ico i-blue">🖥️</span>Frontend</h3>
+        <ul class="clean b" style="margin-top:10px;font-size:12.5px">
+          <li>React 18 + Vite 5</li>
+          <li>Leaflet — geospatial maps</li>
+          <li>Three.js — 3D globe</li>
+          <li>TanStack Query 5</li>
+          <li>Zustand — state store</li>
+          <li>Chart.js + framer-motion</li>
+          <li>vite-plugin-pwa</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3><span class="ico i-green">🗄️</span>Data &amp; Infra</h3>
+        <ul class="clean g" style="margin-top:10px;font-size:12.5px">
+          <li>PostgreSQL + PostGIS</li>
+          <li>Supabase Auth + Realtime</li>
+          <li>Row-Level Security</li>
+          <li>GitHub Actions CI</li>
+          <li>15 versioned migrations</li>
+          <li>Schema drift guard</li>
+          <li>Render + Vercel target</li>
+        </ul>
+      </div>
+    </div>
+    <div class="note" style="margin-top:20px">
+      <strong>Why three real-time channels?</strong> The frontend merges REST polling, Supabase Realtime <span class="mono">postgres_changes</span>, and Socket.io pushes into a single store. If any one channel degrades during an actual emergency, the live map stays current — <strong>redundancy is a safety requirement, not over-engineering</strong>.
+    </div>
+  </div>
+  <div class="brandmark">CivicShield AI</div>
+  <div class="slideno">05</div>
+</section>
+
+<!-- ============ 6 · DATA SOURCES ============ -->
+<section class="slide">
+  <div class="kicker">Innovation — The India Proxy Strategy</div>
+  <h2>Solving the closed-API problem</h2>
+  <p class="sub">India's official portals (NCS, IMD, CWC, SACHET) have no public APIs. Rather than abandon India-specific data, we engineered <strong>authoritative open substitutes</strong> for each — attributed transparently.</p>
+  <div class="body">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th style="width:20%">Indian Authority</th><th style="width:8%">API?</th><th style="width:30%">Our Open Substitute</th><th>Engineering Approach</th></tr></thead>
+        <tbody>
+          <tr><td><strong>NCS</strong> — Seismology</td><td class="no">Closed</td><td>USGS FDSN, India bbox</td><td>68–98°E / 6–38°N bounded query, mag ≥3.0, BIS seismic-zone severity mapping</td></tr>
+          <tr><td><strong>CWC</strong> — Water Commission</td><td class="no">Closed</td><td>Open-Meteo GloFAS</td><td>18 river gauge stations; GloFAS is the same model CWC itself uses</td></tr>
+          <tr><td><strong>IMD</strong> — Meteorology</td><td class="no">Closed</td><td>Open-Meteo Forecast</td><td>18 cities; season-aware heatwave, cold wave, rainfall, cyclone-wind thresholds</td></tr>
+          <tr><td><strong>SACHET</strong> — NDMA Alerts</td><td class="no">Client-rendered</td><td>Auto-alert pipeline</td><td>Cron auto-dispatches High/Critical India events across 5 channels</td></tr>
+          <tr><td>Global multi-hazard</td><td class="yes">Open</td><td>GDACS + NASA EONET</td><td>RSS + India bbox query; category normalization into unified event model</td></tr>
+          <tr><td>Fire detection</td><td class="yes">Open</td><td>NASA FIRMS VIIRS</td><td>India bbox CSV; Fire Radiative Power → severity classification</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note g" style="margin-top:18px">
+      <strong>Deduplication engineering:</strong> The global USGS poller explicitly <em>excludes</em> the India bounding box so that Indian earthquakes are owned exclusively by the NCS-proxy poller — preventing the same quake appearing twice with different severities. All events upsert on a deterministic <span class="mono">dedup_hash</span>.
+    </div>
+  </div>
+  <div class="brandmark">CivicShield AI</div>
+  <div class="slideno">06</div>
+</section>
+
+<!-- ============ 7 · vs NDEM ============ -->
+<section class="slide">
+  <div class="kicker">Competitive Analysis</div>
+  <h2>CivicShield AI vs. NDEM <span style="font-size:19px;font-weight:500;color:var(--muted)">(ISRO / NRSC)</span></h2>
+  <p class="sub">NDEM is India's national geospatial disaster repository, built by NRSC/ISRO under the Ministry of Home Affairs. It is authoritative and satellite-grade — but architecturally solves a <strong>different problem</strong> than ours.</p>
+  <div class="body">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th style="width:24%">Dimension</th><th style="width:38%">NDEM (ISRO/NRSC)</th><th>CivicShield AI</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Primary users</strong></td><td>Disaster managers, NDRF/SDRF, State officials</td><td class="yes">Citizens + coordinators + admins — public tier needs no login</td></tr>
+          <tr><td><strong>Public access</strong></td><td class="no">Credential + captcha login required</td><td class="yes">Open public portal; live map visible to anyone</td></tr>
+          <tr><td><strong>Citizen reporting</strong></td><td class="no">None — one-directional dissemination</td><td class="yes">Geo-tagged reports + photos + AI triage + SOS</td></tr>
+          <tr><td><strong>Data foundation</strong></td><td class="yes">Satellite imagery, superior geospatial depth</td><td class="part">Open multi-source API aggregation (8 feeds)</td></tr>
+          <tr><td><strong>Update model</strong></td><td>Product-cycle / periodic bulletins</td><td class="yes">Continuous — 5 min polling, sub-second push</td></tr>
+          <tr><td><strong>Alert delivery</strong></td><td>Portal + institutional channels</td><td class="yes">5 channels: push, SMS, WhatsApp, Telegram, email</td></tr>
+          <tr><td><strong>Mobile / offline</strong></td><td class="no">Desktop web portal</td><td class="yes">Installable PWA, service worker, offline cache</td></tr>
+          <tr><td><strong>Feedback loop</strong></td><td class="no">Top-down only</td><td class="yes">Bi-directional — citizen reports become live events</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note" style="margin-top:16px">
+      <strong>Our honest position:</strong> We do not claim to replace NDEM — it has satellite assets and institutional authority we cannot match. CivicShield fills the gap NDEM structurally leaves open: <strong>the citizen-facing, real-time, bi-directional layer</strong>. The two are complementary; NDEM is the authoritative backbone, CivicShield is the public nervous system.
+    </div>
+  </div>
+  <div class="brandmark">CivicShield AI</div>
+  <div class="slideno">07</div>
+</section>
+
+<!-- ============ 8 · CORE FEATURES ============ -->
+<section class="slide">
+  <div class="kicker">Feature Set — Part 1</div>
+  <h2>Geospatial Intelligence &amp; Real-Time Engine</h2>
+  <div class="body">
+    <div class="cols c2" style="flex:1">
+      <div>
+        <div class="frow"><div class="ico i-blue">🗺️</div><div><div class="frow-t">Live Leaflet Hazard Map</div><div class="frow-d">India-centered; custom severity-colored markers per event type with critical-pulse badges and detail popups.</div></div></div>
+        <div class="frow"><div class="ico i-amber">🌡️</div><div><div class="frow-t">Event Density Heatmap</div><div class="frow-d">Severity-weighted radial overlay built on pure Leaflet CircleMarkers — no plugin dependency. Toggleable.</div></div></div>
+        <div class="frow"><div class="ico i-red">📐</div><div><div class="frow-t">BIS Seismic Zone Overlay</div><div class="frow-d">IS 1893 Zones II–V rendered as translucent polygons with tooltips — contextualizes every earthquake.</div></div></div>
+        <div class="frow"><div class="ico i-green">🇮🇳</div><div><div class="frow-t">State Boundary Layer</div><div class="frow-d">Datameet GeoJSON with per-state alert coloring; click a state to fit bounds and filter events.</div></div></div>
+      </div>
+      <div>
+        <div class="frow"><div class="ico i-violet">⚡</div><div><div class="frow-t">Triple-Redundant Live Feed</div><div class="frow-d">REST polling + Supabase Realtime + Socket.io merged into one Zustand store — survives channel failure.</div></div></div>
+        <div class="frow"><div class="ico i-blue">🔐</div><div><div class="frow-t">JWT-Verified Socket Rooms</div><div class="frow-d">Handshake verifies the Supabase JWT server-side, then assigns <span class="mono">public</span>/<span class="mono">role:*</span>/<span class="mono">state:*</span> rooms — clients cannot self-assert privilege.</div></div></div>
+        <div class="frow"><div class="ico i-amber">🧭</div><div><div class="frow-t">Jurisdiction Auto-Scoping</div><div class="frow-d">Coordinators' map auto-fits and filters to their assigned state bbox — enforced at API and DB layer.</div></div></div>
+        <div class="frow"><div class="ico i-green">🚑</div><div><div class="frow-t">Evacuation Routing + POIs</div><div class="frow-d">Route geometry between points; hospitals, shelters, fire and police pulled live via Overpass API.</div></div></div>
+      </div>
+    </div>
+    <div class="code" style="margin-top:8px">
+<span class="c">// Geospatial storage — PostGIS GEOGRAPHY with GIST index</span>
+<span class="k">location</span> GEOGRAPHY(POINT, 4326)   <span class="c">// WGS-84, returned as EWKB hex, parsed client-side to {lat, lon}</span>
+<span class="k">SELECT</span> get_state_from_point(28.61, 77.20);  <span class="c">// → resolves any coordinate to its Indian state UUID</span>
+    </div>
+  </div>
+  <div class="brandmark">CivicShield AI</div>
+  <div class="slideno">08</div>
+</section>
+
+<!-- ============ 9 · AI / ML ============ -->
+<section class="slide">
+  <div class="kicker">Feature Set — Part 2</div>
+  <h2>The AI &amp; Intelligence Layer</h2>
+  <p class="sub">We label every model honestly — validated statistical models, rule-based classifiers, and true ML are each marked as what they are.</p>
+  <div class="body">
+    <div class="cols c3" style="flex:1">
+      <div class="card">
+        <h3><span class="ico i-violet">📈</span>Risk Forecasting <span class="pill p-live">Prophet</span></h3>
+        <p style="margin-top:8px">Facebook Prophet time-series with yearly/weekly seasonality and 80% confidence intervals. Falls back to linear extrapolation if unavailable. Confidence derived from coefficient of variation.</p>
+      </div>
+      <div class="card">
+        <h3><span class="ico i-blue">📷</span>AI Photo Classifier <span class="pill p-live">Live ML</span></h3>
+        <p style="margin-top:8px">Citizen incident photos classified via HuggingFace Inference API (ResNet-50). Returns damage type + suggested severity + confidence into the coordinator queue. Fails gracefully — never blocks submission.</p>
+      </div>
+      <div class="card">
+        <h3><span class="ico i-amber">⚖️</span>Severity Calibration <span class="pill p-rule">Rules</span></h3>
+        <p style="margin-top:8px">ML service re-scores every ingested event. Overrides the source severity only when confidence ≥ 0.80 — otherwise the original stands. Silent degradation if ML is unreachable.</p>
+      </div>
+      <div class="card">
+        <h3><span class="ico i-red">🌊</span>Flood Risk — India</h3>
+        <p style="margin-top:8px">Prophet forecast of river discharge against CWC danger levels using <strong>real GloFAS data</strong> across 18 gauge stations → Critical/High/Medium/Low.</p>
+      </div>
+      <div class="card">
+        <h3><span class="ico i-amber">🌏</span>Earthquake Risk — India</h3>
+        <p style="margin-top:8px">NDMA seismic-zone base score combined with Gutenberg–Richter exponential weighting of <strong>real USGS history</strong> within 300 km / 30 days → 0–100 score.</p>
+      </div>
+      <div class="card">
+        <h3><span class="ico i-green">🚚</span>Resource Optimization</h3>
+        <p style="margin-top:8px">Google OR-Tools Vehicle Routing with Haversine distance matrix and guided local search. Greedy allocation consumes supply and reports unmet demand + fulfillment rate.</p>
+      </div>
+    </div>
+    <div class="note r" style="margin-top:18px">
+      <strong>Academic honesty:</strong> Misinformation screening and base severity classification are <em>rule-based</em> (regex patterns + source-credibility allow-lists), not trained models — and we label them as such in code, docs, and UI. The photo classifier is genuine ML; ResNet-50 is a general-purpose classifier, so its output is presented to coordinators as an <strong>"AI suggestion,"</strong> never as ground truth.
+    </div>
+  </div>
+  <div class="brandmark">CivicShield AI</div>
+  <div class="slideno">09</div>
+</section>
+
+<!-- ============ 10 · ALERTING + SOS ============ -->
+<section class="slide">
+  <div class="kicker">Feature Set — Part 3</div>
+  <h2>Multi-Channel Alerting &amp; Emergency SOS</h2>
+  <div class="body">
+    <div class="cols c25" style="flex:1;gap:24px">
+      <div>
+        <div style="font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin-bottom:14px">Alert Dispatch Pipeline</div>
+        <div class="flow" style="margin-bottom:20px">
+          <div class="step"><div class="step-n">1</div><div class="step-t">Create</div><div class="step-d">Coordinator authors alert, or cron auto-detects High/Critical India event</div></div>
+          <div class="step"><div class="step-n">2</div><div class="step-t">Draft</div><div class="step-d">Zod-validated, auto-tagged to state, inserted as <span class="mono">draft</span></div></div>
+          <div class="step"><div class="step-n">3</div><div class="step-t">Route</div><div class="step-d">Async fan-out across 5 channels + optional translation</div></div>
+          <div class="step"><div class="step-n">4</div><div class="step-t">Log</div><div class="step-d">Per-recipient <span class="mono">alert_logs</span> row → status <span class="mono">sent</span></div></div>
+        </div>
+        <div style="font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--blue);margin-bottom:12px">Delivery Channels</div>
+        <div class="nodes">
+          <span class="node">🔔 Web Push (VAPID)</span><span class="node">💬 Telegram</span><span class="node">📱 WhatsApp</span>
+          <span class="node">✉️ SMS (Twilio)</span><span class="node">📧 Email (Resend)</span>
+          <span class="node acc">🌐 7 Indian languages</span>
+        </div>
+        <div class="note g" style="margin-top:18px">
+          <strong>Full delivery observability:</strong> every channel attempt writes an <span class="mono">alert_logs</span> row with recipient, delivered flag, and error message — surfaced in the coordinator UI as a per-alert delivery table. No silent failures.
+        </div>
+      </div>
+      <div>
+        <div class="card" style="border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.05);height:100%">
+          <h3><span class="ico i-red">🆘</span>Emergency SOS System</h3>
+          <ul class="clean r" style="margin-top:14px">
+            <li><strong>One-tap send</strong> from the citizen portal with live GPS coordinates</li>
+            <li>Instantly routed to the <strong>coordinator's state room</strong> via Socket.io</li>
+            <li>SMS auto-dispatched to registered emergency contacts</li>
+            <li>Coordinator <strong>acknowledges → resolves</strong> with inline confirmation</li>
+            <li><strong>Nearest safe zones</strong> surfaced — shelters and hospitals</li>
+            <li>Live status banner keeps the sender informed throughout</li>
+            <li>Fully in-app UI — <strong>no native browser dialogs</strong></li>
+          </ul>
+          <div class="note r" style="margin-top:16px;font-size:12.5px">
+            End-to-end verified: citizen sends → coordinator receives in real time → acknowledge → resolve.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="brandmark">CivicShield AI</div>
+  <div class="slideno">10</div>
+</section>
+
+<!-- ============ 11 · SECURITY ============ -->
+<section class="slide">
+  <div class="kicker">Technical Implementation — Security</div>
+  <h2>Defence in Depth</h2>
+  <p class="sub">Authorization is enforced independently at four layers. A bug in any one layer does not expose data.</p>
+  <div class="body">
+    <div class="cols c4" style="flex:1">
+      <div class="card">
+        <h3><span class="ico i-blue">①</span>Identity</h3>
+        <p style="margin-top:8px">Supabase Auth issues JWTs. A <span class="mono">user_profiles</span> row is auto-created by a database trigger on signup with a default <span class="mono">citizen</span> role — privilege cannot be self-assigned at registration.</p>
+      </div>
+      <div class="card">
+        <h3><span class="ico i-amber">②</span>API Layer</h3>
+        <p style="margin-top:8px"><span class="mono">stateScope</span> middleware verifies the JWT, then loads role and state server-side. Route handlers enforce role checks; coordinators are auto-scoped; destructive routes require coordinator/admin.</p>
+      </div>
+      <div class="card">
+        <h3><span class="ico i-green">③</span>Database</h3>
+        <p style="margin-top:8px">PostgreSQL <strong>Row-Level Security</strong> on every table with least-privilege grants. Anonymous role has SELECT only. Even a fully compromised API cannot read cross-state data.</p>
+      </div>
+      <div class="card">
+        <h3><span class="ico i-violet">④</span>Real-Time</h3>
+        <p style="margin-top:8px">Socket.io handshake verifies the JWT before room assignment. Rooms are server-assigned from verified claims — a client cannot subscribe to another state's channel.</p>
+      </div>
+    </div>
+    <div class="cols c3" style="margin-top:20px;gap:16px">
+      <div class="card">
+        <h3 style="font-size:14px"><span class="ico i-red">🛡️</span>Hardening</h3>
+        <ul class="clean r" style="margin-top:10px;font-size:12.5px">
+          <li>Helmet security headers</li>
+          <li>CORS allow-list (no wildcards)</li>
+          <li>Global + per-route rate limiting</li>
+          <li>XSS escaping in all alert content</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="font-size:14px"><span class="ico i-amber">✅</span>Validation</h3>
+        <ul class="clean" style="margin-top:10px;font-size:12.5px">
+          <li>Zod schemas on every write route</li>
+          <li>Strict object parsing</li>
+          <li>Enum-constrained status fields</li>
+          <li>Incident submit capped 5 / 10 min</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="font-size:14px"><span class="ico i-green">📋</span>Accountability</h3>
+        <ul class="clean g" style="margin-top:10px;font-size:12.5px">
+          <li>Audit log on every state change</li>
+          <li>Reviewer ID + timestamp on reports</li>
+          <li>Rejection requires written reason</li>
+          <li>Admin-only audit log access</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="brandmark">CivicShield AI</div>
+  <div class="slideno">11</div>
+</section>
+
+<!-- ============ 12 · ENGINEERING RIGOR ============ -->
+<section class="slide">
+  <div class="kicker">Documentation &amp; Research</div>
+  <h2>Engineering Discipline</h2>
+  <p class="sub">Beyond features — the process evidence that this is production-intent software, not a demo.</p>
+  <div class="body">
+    <div class="statgrid">
+      <div class="stat"><div class="num n-green">15</div><div class="lbl">Versioned SQL migrations, applied in order via CLI</div></div>
+      <div class="stat"><div class="num n-amber">4</div><div class="lbl">Enforcing CI gates — proven to fail on real breaks</div></div>
+      <div class="stat"><div class="num n-blue">9</div><div class="lbl">Comprehensive documentation files maintained in-repo</div></div>
+      <div class="stat"><div class="num n-violet">36</div><div class="lbl">Indian states &amp; UTs seeded with bounding boxes</div></div>
+    </div>
+    <div class="cols c2" style="flex:1;gap:22px">
+      <div>
+        <div style="font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--green);margin-bottom:13px">Continuous Integration</div>
+        <ul class="clean g">
+          <li><strong>Schema drift guard</strong> — CI applies migrations and <span class="mono">schema.sql</span> to two separate databases, dumps both, and <strong>fails on any statement-level difference</strong></li>
+          <li><strong>RLS integration tests</strong> — run against a real local Supabase stack, not mocks; proven to go red on a genuine policy break</li>
+          <li><strong>Secret scanning</strong> — blocks credential commits; no <span class="mono">.env</span> file has ever entered git history</li>
+          <li><strong>Lint + build + ML import smoke</strong> across all three services on every pull request</li>
+        </ul>
+      </div>
+      <div>
+        <div style="font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--blue);margin-bottom:13px">Research &amp; Documentation</div>
+        <ul class="clean b">
+          <li><strong>PROJECT_DOCUMENTATION.md</strong> — 19-section single source of truth covering every subsystem</li>
+          <li><strong>TECHNICAL_REFERENCE.md</strong> — implementation-level detail for every module</li>
+          <li><strong>FEATURES.md</strong> — complete inventory with honest status flags (✅ / ⚠️ / 🐞 / 🧪)</li>
+          <li><strong>PROJECT_SCORECARD.md</strong> — self-critical 0–10 ratings across 12 engineering standards, updated each phase</li>
+          <li><strong>docs/rls_matrix.md</strong> — role × table authorization matrix</li>
+        </ul>
+      </div>
+    </div>
+    <div class="note" style="margin-top:16px">
+      <strong>The drift guard caught real bugs.</strong> Its first run exposed pre-existing production drift — an invalid <span class="mono">status</span> default violating a CHECK constraint, three stale trigger functions, and four over-permissive RLS policies including a public-readable profiles table. All reconciled in migration 009.
+    </div>
+  </div>
+  <div class="brandmark">CivicShield AI</div>
+  <div class="slideno">12</div>
+</section>
+
+<!-- ============ 13 · DEMO FLOW ============ -->
+<section class="slide">
+  <div class="kicker">Project Demonstration</div>
+  <h2>Live Demo Walkthrough</h2>
+  <p class="sub">A complete end-to-end path through all three roles — every step below runs on live data.</p>
+  <div class="body">
+    <div class="flow" style="margin-bottom:18px">
+      <div class="step"><div class="step-n">1</div><div class="step-t">Public Portal</div><div class="step-d">Open the map with no login. Live events from 8 sources render with severity markers. Toggle the heatmap and BIS seismic zones.</div></div>
+      <div class="step"><div class="step-n">2</div><div class="step-t">Citizen Report</div><div class="step-d">Sign in, submit a geo-tagged incident with a photo. The ML service classifies it in the background.</div></div>
+      <div class="step"><div class="step-n">3</div><div class="step-t">SOS Trigger</div><div class="step-d">One-tap SOS with live GPS. Watch it arrive on the coordinator screen in real time via Socket.io.</div></div>
+      <div class="step"><div class="step-n">4</div><div class="step-t">Coordinator</div><div class="step-d">Review queue shows the report with its AI damage-type badge. Approve → it becomes a live event on the map.</div></div>
+      <div class="step"><div class="step-n">5</div><div class="step-t">Alert + Admin</div><div class="step-d">Dispatch a multi-channel alert, inspect the delivery log, then view nationwide stats in the admin console.</div></div>
+    </div>
+    <div class="cols c3" style="flex:1;gap:16px">
+      <div class="card">
+        <h3 style="font-size:14px"><span class="ico i-green">📡</span>Ingestion Health Panel</h3>
+        <p style="margin-top:8px">Live per-source status grid showing last-run timestamp, event count, and error state for all 8 feeds — proving the data is genuinely live, not seeded.</p>
+      </div>
+      <div class="card">
+        <h3 style="font-size:14px"><span class="ico i-blue">📱</span>Mobile PWA</h3>
+        <p style="margin-top:8px">Install to home screen from a phone on the same network. Responsive navbar, offline map-tile cache, and push notification support.</p>
+      </div>
+      <div class="card">
+        <h3 style="font-size:14px"><span class="ico i-violet">🔬</span>API Surface</h3>
+        <p style="margin-top:8px">FastAPI Swagger UI at <span class="mono">/docs</span> and the backend <span class="mono">/health</span> endpoint reporting DB connectivity, ML reachability, and the active CORS allow-list.</p>
+      </div>
+    </div>
+  </div>
+  <div class="brandmark">CivicShield AI</div>
+  <div class="slideno">13</div>
+</section>
+
+<!-- ============ 14 · SOCIAL IMPACT ============ -->
+<section class="slide">
+  <div class="kicker">Social Impact</div>
+  <h2>Who this actually helps</h2>
+  <div class="body">
+    <div class="cols c2" style="flex:1;gap:24px">
+      <div>
+        <div class="frow"><div class="ico i-red">⏱️</div><div><div class="frow-t">Minutes matter in disaster response</div><div class="frow-d">Golden-hour survival rates fall sharply after the first 60 minutes. Sub-second alert propagation across five channels — including SMS, which works on feature phones without internet — directly compresses time-to-awareness.</div></div></div>
+        <div class="frow"><div class="ico i-blue">📶</div><div><div class="frow-t">Designed for low-connectivity India</div><div class="frow-d">Service worker caches map tiles for offline viewing. SMS and WhatsApp reach users with no smartphone or data. The PWA installs in under 2 MB.</div></div></div>
+        <div class="frow"><div class="ico i-green">🗣️</div><div><div class="frow-t">Language is an access barrier</div><div class="frow-d">Alerts translate into Hindi, Tamil, Telugu, Bengali, Gujarati, Marathi, and Punjabi — an English-only alert excludes the majority of at-risk populations.</div></div></div>
+      </div>
+      <div>
+        <div class="frow"><div class="ico i-amber">👁️</div><div><div class="frow-t">Citizens as sensors</div><div class="frow-d">Satellite and station networks cannot see a collapsed footbridge or a blocked evacuation road. Verified citizen reports fill the ground-truth gap that no remote-sensing system can cover.</div></div></div>
+        <div class="frow"><div class="ico i-violet">🏛️</div><div><div class="frow-t">State-level operational autonomy</div><div class="frow-d">India's disaster response is constitutionally state-led. Jurisdiction scoping is built into the data model — coordinators see and act on their state only, with a national view reserved for administrators.</div></div></div>
+        <div class="frow"><div class="ico i-red">🔍</div><div><div class="frow-t">Misinformation is a disaster multiplier</div><div class="frow-d">Panic-driven false reports cost lives and misdirect resources. Automated credibility screening flags suspicious content before it propagates through official channels.</div></div></div>
+      </div>
+    </div>
+    <div class="note g" style="margin-top:14px">
+      <strong>Design principle throughout:</strong> every feature degrades gracefully. If the ML service is down, submissions still work. If Redis is absent, requests still resolve. If a notification provider has no key, the others still fire. <strong>In an emergency system, partial function must never become total failure.</strong>
+    </div>
+  </div>
+  <div class="brandmark">CivicShield AI</div>
+  <div class="slideno">14</div>
+</section>
+
+<!-- ============ 15 · HONEST STATUS ============ -->
+<section class="slide">
+  <div class="kicker">Current Status</div>
+  <h2>What's done — and what we're honest about</h2>
+  <div class="body">
+    <div class="cols c2" style="flex:1;gap:22px">
+      <div class="card" style="border-color:rgba(16,185,129,.3)">
+        <h3><span class="ico i-green">✓</span>Verified &amp; Working</h3>
+        <ul class="clean g" style="margin-top:13px;font-size:13px">
+          <li>All 8 ingestion sources polling live on schedule</li>
+          <li>Real-time map, heatmap, seismic and state overlays</li>
+          <li>Full citizen → coordinator → event approval pipeline</li>
+          <li>SOS end-to-end: send → receive → acknowledge → resolve</li>
+          <li>AI photo classification writing live results to the database</li>
+          <li>Multi-channel alerting with per-recipient delivery logs</li>
+          <li>Ingestion health endpoint returning live source telemetry</li>
+          <li>Role-based access enforced at all four layers</li>
+          <li>PWA installable with offline service worker</li>
+          <li>CI green — lint, tests, RLS, schema drift, secret scan</li>
+        </ul>
+      </div>
+      <div class="card" style="border-color:rgba(245,158,11,.3)">
+        <h3><span class="ico i-amber">⚠</span>Known Limitations — Disclosed</h3>
+        <ul class="clean" style="margin-top:13px;font-size:13px">
+          <li><strong>Severity &amp; misinformation classifiers are rule-based</strong>, not trained models — labelled as such everywhere</li>
+          <li><strong>ResNet-50 is general-purpose</strong>, not disaster-trained; output is framed as an AI suggestion for human review</li>
+          <li><strong>No published accuracy metrics</strong> — model validation is the top item on our roadmap</li>
+          <li><strong>Production schema reconciliation pending</strong> — prod carries more advanced RLS than the codebase; deliberately not force-pushed</li>
+          <li><strong>Single database, no DR runbook yet</strong> — backup and tested restore are planned pre-launch</li>
+          <li><strong>Frontend test coverage is thin</strong> relative to backend integration coverage</li>
+        </ul>
+      </div>
+    </div>
+    <div class="note" style="margin-top:18px">
+      <strong>Why we present limitations openly:</strong> an emergency system that overstates its own reliability is dangerous. Every heuristic is labelled a heuristic in the code, the documentation, and the user interface. We would rather be evaluated on what we actually built than on what we could claim.
+    </div>
+  </div>
+  <div class="brandmark">CivicShield AI</div>
+  <div class="slideno">15</div>
+</section>
+
+<!-- ============ 16 · ROADMAP ============ -->
+<section class="slide">
+  <div class="kicker">Roadmap</div>
+  <h2>Deployment Path &amp; Next Phase</h2>
+  <div class="body">
+    <div style="font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--amber);margin-bottom:14px">Deployment Architecture</div>
+    <div class="flow" style="margin-bottom:22px">
+      <div class="step"><div class="step-n">1</div><div class="step-t">Schema Reconciliation</div><div class="step-d">Rehearse on a restored backup, capture the safe delta, apply only verified-missing pieces to production</div></div>
+      <div class="step"><div class="step-n">2</div><div class="step-t">Frontend → Vercel</div><div class="step-d">Static React build, auto-deploy on push to main, global CDN edge delivery</div></div>
+      <div class="step"><div class="step-n">3</div><div class="step-t">Services → Render</div><div class="step-d">Backend and ML as two web services — persistent processes required for Socket.io and cron</div></div>
+      <div class="step"><div class="step-n">4</div><div class="step-t">Supabase Cloud</div><div class="step-d">Managed Postgres + PostGIS + Auth + Realtime with RLS enforced</div></div>
+    </div>
+    <div class="cols c3" style="flex:1;gap:16px">
+      <div class="card">
+        <h3 style="font-size:14px"><span class="ico i-violet">🎯</span>Near Term</h3>
+        <ul class="clean" style="margin-top:10px;font-size:12.5px">
+          <li>Published model accuracy metrics</li>
+          <li>Expanded frontend test coverage</li>
+          <li>Backup + tested restore runbook</li>
+          <li>Observability dashboards</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="font-size:14px"><span class="ico i-blue">🚀</span>Feature Roadmap</h3>
+        <ul class="clean b" style="margin-top:10px;font-size:12.5px">
+          <li>Volunteer coordination module</li>
+          <li>Responder field GPS tracking</li>
+          <li>Cross-state cascade detection</li>
+          <li>Offline report queueing</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="font-size:14px"><span class="ico i-green">🤝</span>Integration Vision</h3>
+        <ul class="clean g" style="margin-top:10px;font-size:12.5px">
+          <li>Official NDMA/SACHET data feed</li>
+          <li>NDEM geospatial layer ingestion</li>
+          <li>State SDMA onboarding</li>
+          <li>Bhuvan satellite imagery linking</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  <div class="brandmark">CivicShield AI</div>
+  <div class="slideno">16</div>
+</section>
+
+<!-- ============ 17 · Q&A PREP ============ -->
+<section class="slide">
+  <div class="kicker">Anticipated Questions</div>
+  <h2>Q&amp;A Preparation</h2>
+  <div class="body">
+    <div class="cols c2" style="flex:1;gap:20px">
+      <div>
+        <div class="card" style="margin-bottom:13px;padding:15px 18px">
+          <div class="frow-t" style="color:var(--amber);margin-bottom:6px">"Is this real ML or just rules?"</div>
+          <p style="font-size:12.5px">Both — and we label which is which. The photo classifier is genuine ML via HuggingFace. Prophet forecasting is a validated statistical model. Severity and misinformation classifiers are explicitly rule-based, marked 🧪 in our feature inventory.</p>
+        </div>
+        <div class="card" style="margin-bottom:13px;padding:15px 18px">
+          <div class="frow-t" style="color:var(--amber);margin-bottom:6px">"How is this different from NDEM?"</div>
+          <p style="font-size:12.5px">NDEM is credential-gated for officials and one-directional. We are public-facing, real-time, and bi-directional — citizens both receive alerts and contribute ground-truth reports. Complementary, not competing.</p>
+        </div>
+        <div class="card" style="padding:15px 18px">
+          <div class="frow-t" style="color:var(--amber);margin-bottom:6px">"How do you prevent duplicate events?"</div>
+          <p style="font-size:12.5px">A deterministic <span class="mono">dedup_hash</span> as a unique upsert key, plus source-level partitioning — the global USGS poller excludes the India bbox so Indian quakes are owned solely by the NCS proxy.</p>
+        </div>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:13px;padding:15px 18px">
+          <div class="frow-t" style="color:var(--blue);margin-bottom:6px">"What if a citizen submits a false report?"</div>
+          <p style="font-size:12.5px">Reports never auto-publish. Every submission enters a <span class="mono">pending_review</span> queue requiring explicit coordinator approval, with rate limiting at 5 per 10 minutes, an audit trail, and mandatory written justification for rejection.</p>
+        </div>
+        <div class="card" style="margin-bottom:13px;padding:15px 18px">
+          <div class="frow-t" style="color:var(--blue);margin-bottom:6px">"Can a coordinator see another state's data?"</div>
+          <p style="font-size:12.5px">No — blocked independently at four layers: API middleware scoping, route-level role checks, PostgreSQL Row-Level Security, and server-assigned Socket.io rooms. Compromising one layer does not grant access.</p>
+        </div>
+        <div class="card" style="padding:15px 18px">
+          <div class="frow-t" style="color:var(--blue);margin-bottom:6px">"What happens when a data source goes down?"</div>
+          <p style="font-size:12.5px">Each poller is independently scheduled and wrapped in error handling — one failing source cannot stall the others. The ingestion health panel surfaces the failure with its timestamp and error, and stale events auto-deactivate by TTL.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="brandmark">CivicShield AI</div>
+  <div class="slideno">17</div>
+</section>
+
+<!-- ============ 18 · CLOSING ============ -->
+<section class="slide title-slide">
+  <div class="kicker">Thank You</div>
+  <h1 style="font-size:64px">Questions?</h1>
+  <p class="tagline" style="margin-top:14px">CivicShield AI — unifying India's fragmented hazard data into one live, public, bi-directional operational picture.</p>
+  <div class="cols c4" style="margin-top:44px;gap:16px;width:100%">
+    <div class="stat"><div class="num n-amber">8</div><div class="lbl">Live data sources unified</div></div>
+    <div class="stat"><div class="num n-green">5</div><div class="lbl">Alert delivery channels</div></div>
+    <div class="stat"><div class="num n-blue">4</div><div class="lbl">Independent security layers</div></div>
+    <div class="stat"><div class="num n-violet">36</div><div class="lbl">States &amp; UTs supported</div></div>
+  </div>
+  <div class="brandmark">Final Project Evaluation</div>
+  <div class="slideno">18</div>
+</section>
+
+</div>
+
+<div class="helpbar noprint">
+  <b>Ctrl/Cmd + P</b> → Save as PDF &nbsp;·&nbsp; Set margins to <b>None</b>, enable <b>Background graphics</b>
+</div>
+
+</body>
+</html>
